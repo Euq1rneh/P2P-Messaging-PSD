@@ -2,9 +2,19 @@ package Peer;
 
 import Peer.Network.ConnectionManager;
 
+import java.net.ServerSocket;
+
 public class Peer {
 
-    public Peer(){}
+    private String name;
+    private int port;
+
+    private ServerSocket peer_server;
+
+    public Peer(String name, int port){
+        this.name = name;
+        this.port = port;
+    }
 
     public int send_message(String msg, int conversation_id){
         return -1;
@@ -18,7 +28,13 @@ public class Peer {
 
     }
 
-    public void start_peer(){
-        ConnectionManager.try_connect_to_peer("localhost:12345");
+    public void start(){
+        // Start peer server for accepting messaging requests
+        peer_server = ConnectionManager.peer_server(port);
+
+        if(peer_server == null){
+            System.out.println("<------Error starting peer------>");
+            return;
+        }
     }
 }
