@@ -2,5 +2,5 @@
 Projeto de PSD
 
 ## Commands
-  :q - quit
-  :c - connect
+  - :q - quit
+  - :c - connect
