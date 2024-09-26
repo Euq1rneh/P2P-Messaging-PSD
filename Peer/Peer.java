@@ -59,7 +59,7 @@ public class Peer {
             @Override
             public void run() {
                 try (ServerSocket serverSocket = ConnectionManager.peer_server(port)) {
-                    System.out.println("Server started on port " + port + ", waiting for connections...");
+                    //System.out.println("Server started on port " + port + ", waiting for connections...");
 
                     // Continuously accept incoming client connections
                     while (!serverSocket.isClosed()) {
