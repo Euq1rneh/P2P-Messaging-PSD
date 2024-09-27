@@ -1,6 +1,7 @@
 import Peer.Network.ConnectionManager;
 import Peer.Peer;
 
+import java.net.Socket;
 import java.util.Scanner;
 
 public class Main {
@@ -12,10 +13,10 @@ public class Main {
         String userName = sc.nextLine();  // Read user input
         System.out.print("In Port: ");
         int in_port = sc.nextInt();
-//        System.out.print("Out Port: ");
-//        int out_port = sc.nextInt();
+        System.out.print("Out Port: ");
+        int out_port = sc.nextInt();
 
-        Peer peer = new Peer(userName, in_port);
+        Peer peer = new Peer(userName, in_port, out_port);
 
         peer.start();
 
@@ -33,7 +34,12 @@ public class Main {
                 System.out.print("Peer address: ");
                 String peer_address = sc.nextLine();
                 int peer_port = sc.nextInt();
-                ConnectionManager.try_connect_to_peer(peer_address, peer_port);
+
+                if(ConnectionManager.try_connect_to_peer(peer_address, peer_port) == -1){
+                    continue;
+                }
+
+                System.out.println("Connection successful!");
             }
         }
     }

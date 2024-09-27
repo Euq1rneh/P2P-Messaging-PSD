@@ -20,7 +20,7 @@ public class ConnectionManager {
             return new Socket(address, port);
         } catch (IOException e) {
             System.out.println("The peer you're trying to connect to is not online");
-            throw new RuntimeException(e);
+            return null;
         }
     }
 
@@ -39,7 +39,10 @@ public class ConnectionManager {
         System.out.printf("Trying to connect to %s:%d\n", peer_address, peer_port);
         Socket s = peer_client(peer_address, peer_port);
 
-        close_socket(s);
-        return -1;
+        if(s == null){
+            System.out.println("Could not establish connection with specified peer");
+            return -1;
+        }
+        return 0;
     }
 }

@@ -9,13 +9,16 @@ import java.net.Socket;
 public class Peer {
 
     private String name;
-    private int port;
+    private final int in_port;
+    private final int out_port;
 
     private ServerSocket peer_in;
+    private Socket peer_out;
 
-    public Peer(String name, int port){
+    public Peer(String name, int in_port, int out_port){
         this.name = name;
-        this.port = port;
+        this.in_port = in_port;
+        this.out_port = out_port;
     }
 
     public int send_message(String msg, String peer_address, int peer_port){
@@ -24,10 +27,22 @@ public class Peer {
             return -1;
         }
 
+        //should check if the ip and port match if so there is no need to disconect
+        if(peer_out.isConnected()){
+            try {
+                peer_out.close();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
         if(ConnectionManager.try_connect_to_peer(peer_address, peer_port) == -1){
             System.out.printf("Could not establish connection to peer (%s:%d)\n", peer_address, peer_port);
             return -1;
         }
+
+        System.out.println("Connection successful");
+
 
         return -1;
     }
@@ -41,32 +56,16 @@ public class Peer {
     }
 
     public void start(){
-        // Start peer server for accepting messaging requests
-//        peer_in = ConnectionManager.peer_server(port);
-//        if(peer_in == null){
-//            System.out.println("<------Error starting peer------>");
-//            return;
-//        }
-//        if(peer_in.isClosed()){
-//            System.out.println("Peer in is closed");
-//            return;
-//        }else{
-//            System.out.println("Peer in socket created");
-//        }
-
         // Create a thread to handle accepting connections
         Thread connectionAcceptorThread = new Thread(new Runnable() {
             @Override
             public void run() {
-                try (ServerSocket serverSocket = ConnectionManager.peer_server(port)) {
-                    //System.out.println("Server started on port " + port + ", waiting for connections...");
-
-                    // Continuously accept incoming client connections
+                try (ServerSocket serverSocket = ConnectionManager.peer_server(in_port)) {
+                    peer_in = serverSocket;
                     while (!serverSocket.isClosed()) {
                         try {
                             Socket clientSocket = serverSocket.accept();
-                            System.out.println("Accepted connection from " + clientSocket.getInetAddress().getHostAddress());
-
+                            System.out.println("Accepted connection from peer" + clientSocket.getInetAddress().getHostAddress());
                             // Optionally handle the clientSocket in another thread here if needed
                         } catch (IOException e) {
                             System.out.println("Error accepting connection");
@@ -74,7 +73,7 @@ public class Peer {
                         }
                     }
                 } catch (IOException e) {
-                    System.out.println("Error creating server socket");
+                    System.out.println("There was an error while trying to start peer");
                     e.printStackTrace();
                 }
             }
