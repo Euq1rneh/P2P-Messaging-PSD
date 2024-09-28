@@ -1,5 +1,6 @@
 package Peer.Network;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
 import java.net.ServerSocket;
@@ -35,10 +36,11 @@ public class ConnectionManager {
      * Closes the socket passed as an argument
      * @param socket the socket to close
      */
-    public static void close_socket(Socket socket){
-        if(socket.isClosed()){
+    public static void close_socket(Closeable socket){
+        if(socket == null){
             return;
         }
+
         try {
             socket.close();
         } catch (IOException e) {
@@ -69,16 +71,9 @@ public class ConnectionManager {
             // Flush the stream to make sure the data is sent
             out.flush();
 
-            System.out.println("Sent packet: " + packet.message);
+            System.out.println("Sent packet");
         } catch (IOException e) {
             System.out.println("Error sending packet: " + e.getMessage());
-        } finally {
-            try {
-                // NEED TO BE CAREFUL BECAUSE BOTH SENDER AND READER CLOSE THE SOCKET WHICH GENERATES EXCEPTION
-                socket.close();
-            } catch (IOException e) {
-                System.out.println("Error closing socket: " + e.getMessage());
-            }
         }
     }
 }

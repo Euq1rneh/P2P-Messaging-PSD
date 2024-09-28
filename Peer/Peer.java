@@ -7,13 +7,12 @@ import Peer.Network.Packet;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketException;
 
 public class Peer {
-
     private String name;
     private final int in_port;
     private final int out_port;
-
     private ServerSocket peer_in;
     private Socket peer_out;
 
@@ -80,7 +79,7 @@ public class Peer {
     /**
      * Starts the peer by opening a socket that is responsible for accepting connections and reading the incoming messages
      */
-    public void start(){
+    public void start(boolean running){
         // Create a thread to handle accepting connections
         Thread connectionAcceptorThread = new Thread(new Runnable() {
             @Override
@@ -92,12 +91,16 @@ public class Peer {
                             Socket clientSocket = serverSocket.accept();
                             System.out.println("Accepted connection from peer" + clientSocket.getInetAddress().getHostAddress());
 
-                            new Thread(new MessageReader(clientSocket)).start();
-                        } catch (IOException e) {
+                            new Thread(new MessageReader(clientSocket, running)).start();
+                        } catch (SocketException e) {
+                            // this exception hopefully will only be thrown when quiting the program
+                            // so there is no need to handle the error
+                        }catch (IOException e) {
                             System.out.println("Error accepting connection");
                             e.printStackTrace();
                         }
                     }
+                    System.out.println("Server socket closed");
                 } catch (IOException e) {
                     System.out.println("There was an error while trying to start peer");
                     e.printStackTrace();
@@ -107,5 +110,10 @@ public class Peer {
 
         // Start the thread that accepts connections
         connectionAcceptorThread.start();
+    }
+
+    public void close(){
+        ConnectionManager.close_socket(peer_out);
+        ConnectionManager.close_socket(peer_in);
     }
 }
