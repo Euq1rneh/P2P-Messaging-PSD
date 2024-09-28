@@ -85,8 +85,7 @@ public class ConnectionManager {
                 return -1;
             }
             System.out.println("Received ACK packet");
-            //TODO change file name
-            MessageLogger.write_message_log(packet.get_sender() + ": " +packet.get_data(), "teste");
+            MessageLogger.write_message_log(packet.get_sender() + ": " +packet.get_data(), ack.get_sender() + ".conversation");
             return 0;
         } catch (IOException e) {
             System.out.println("Error sending packet: " + e.getMessage());

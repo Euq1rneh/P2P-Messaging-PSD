@@ -96,7 +96,7 @@ public class Peer {
                             Socket clientSocket = serverSocket.accept();
                             System.out.println("Accepted connection from peer" + clientSocket.getInetAddress().getHostAddress());
 
-                            new Thread(new MessageReader(clientSocket, running)).start();
+                            new Thread(new MessageReader(name, clientSocket, running)).start();
                         } catch (SocketException e) {
                             // this exception hopefully will only be thrown when quiting the program
                             // so there is no need to handle the error
