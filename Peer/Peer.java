@@ -1,6 +1,8 @@
 package Peer;
 
+import Peer.Messages.MessageReader;
 import Peer.Network.ConnectionManager;
+import Peer.Network.Packet;
 
 import java.io.IOException;
 import java.net.ServerSocket;
@@ -22,13 +24,15 @@ public class Peer {
     }
 
     public int send_message(String msg, String peer_address, int peer_port){
-        if(msg.isEmpty() || msg.isBlank() || msg == null){
+        if(msg == null || msg.isEmpty() || msg.isBlank()){
             System.out.println("No message was provided");
             return -1;
         }
 
+
+
         //should check if the ip and port match if so there is no need to disconect
-        if(peer_out.isConnected()){
+        if(peer_out != null && peer_out.isConnected()){
             try {
                 peer_out.close();
             } catch (IOException e) {
@@ -36,15 +40,19 @@ public class Peer {
             }
         }
 
-        if(ConnectionManager.try_connect_to_peer(peer_address, peer_port) == -1){
+        peer_out = ConnectionManager.try_connect_to_peer(peer_address, peer_port);
+
+        if(peer_out == null){
             System.out.printf("Could not establish connection to peer (%s:%d)\n", peer_address, peer_port);
             return -1;
         }
-
         System.out.println("Connection successful");
 
+        Packet p = new Packet(name, msg);
 
-        return -1;
+        ConnectionManager.sendPacket(p, peer_out);
+
+        return 0;
     }
 
     public int open_conversation(int conversation_id){
@@ -66,7 +74,8 @@ public class Peer {
                         try {
                             Socket clientSocket = serverSocket.accept();
                             System.out.println("Accepted connection from peer" + clientSocket.getInetAddress().getHostAddress());
-                            // Optionally handle the clientSocket in another thread here if needed
+
+                            new Thread(new MessageReader(clientSocket)).start();
                         } catch (IOException e) {
                             System.out.println("Error accepting connection");
                             e.printStackTrace();

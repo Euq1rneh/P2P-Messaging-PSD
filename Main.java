@@ -1,6 +1,7 @@
 import Peer.Network.ConnectionManager;
 import Peer.Peer;
 
+import java.io.IOException;
 import java.net.Socket;
 import java.util.Scanner;
 
@@ -33,13 +34,38 @@ public class Main {
             } else if (command.contains(":c")) {
                 System.out.print("Peer address: ");
                 String peer_address = sc.nextLine();
+                System.out.print("Peer port: ");
                 int peer_port = sc.nextInt();
-
-                if(ConnectionManager.try_connect_to_peer(peer_address, peer_port) == -1){
+                System.out.println("Starting connection test...");
+                Socket s = ConnectionManager.try_connect_to_peer(peer_address, peer_port);
+                if(s == null){
+                    System.out.println("Could not establish connection...");
                     continue;
                 }
 
                 System.out.println("Connection successful!");
+                System.out.println("Closing connection");
+
+                try {
+                    s.close();
+                }catch (IOException e) {
+                    System.out.println("Connection test finished with errors...");
+                    System.exit(-1);
+                }
+
+                System.out.println("Connection test finished...");
+            }else if (command.contains(":m")){
+                //this block should disappear
+                //when opening a conversation the ip and port should be automatically retrieved
+                String peer_address = "127.0.0.1";
+                int peer_port = 5678;
+
+                System.out.print("Message: ");
+                String message = sc.nextLine();
+
+                if(peer.send_message(message, peer_address, peer_port) == -1){
+                    System.out.println("Error sending message to peer");
+                }
             }
         }
     }

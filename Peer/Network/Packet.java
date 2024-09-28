@@ -13,6 +13,8 @@ public class Packet implements Serializable {
     public Packet(String sender, String message){
         this.sender = sender;
         this.message = message;
+
+        set_timestamp();
     }
 
     public void set_timestamp(){
