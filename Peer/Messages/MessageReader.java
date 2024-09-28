@@ -24,9 +24,7 @@ public class MessageReader implements Runnable {
             // possibly because both peers close the socket
             while ((packet = (Packet) in.readObject()) != null) {
                 // Print out the Packet details
-                System.out.println("Received from: " + packet.sender);
-                System.out.println("Message: " + packet.message);
-                System.out.println("Timestamp: " + packet.timestamp);
+                System.out.println(packet.sender + ": " + packet.message);
             }
         } catch (IOException e) {
             System.out.println("Error reading from peer: " + e.getMessage());

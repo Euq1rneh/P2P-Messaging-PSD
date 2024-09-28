@@ -55,10 +55,16 @@ public class Main {
 
                 System.out.println("Connection test finished...");
             }else if (command.contains(":m")){
+                String[] command_args = command.split(" ");
+                if(command_args.length != 3){
+                    System.out.println("Incorrect number of arguments");
+                    continue;
+                }
+
                 //this block should disappear
                 //when opening a conversation the ip and port should be automatically retrieved
-                String peer_address = "127.0.0.1";
-                int peer_port = 5678;
+                String peer_address = command_args[1];
+                int peer_port = Integer.parseInt(command_args[2]);
 
                 System.out.print("Message: ");
                 String message = sc.nextLine();
