@@ -3,4 +3,6 @@ Projeto de PSD
 
 ## Commands
   - :q - quit
-  - :c - connect
+  - :c - test connection
+  - :m - send message (ip and ports are hardcoded)
+

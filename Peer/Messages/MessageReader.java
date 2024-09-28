@@ -20,6 +20,8 @@ public class MessageReader implements Runnable {
             Packet packet;
 
             // Continuously read objects until the connection is closed
+            // will throw IOException after reading one packet
+            // possibly because both peers close the socket
             while ((packet = (Packet) in.readObject()) != null) {
                 // Print out the Packet details
                 System.out.println("Received from: " + packet.sender);
