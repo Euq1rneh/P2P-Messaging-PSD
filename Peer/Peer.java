@@ -1,10 +1,12 @@
 package Peer;
 
 import Peer.Data.PacketType;
+import Peer.Messages.MessageLogger;
 import Peer.Messages.MessageReader;
 import Peer.Network.ConnectionManager;
 import Peer.Network.Packet;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -85,6 +87,11 @@ public class Peer {
      * Starts the peer by opening a socket that is responsible for accepting connections and reading the incoming messages
      */
     public void start(boolean running){
+        //1. check for conversation dir
+        //2. start thread for accepting connections
+
+        MessageLogger.build_conversation_dir();
+
         // Create a thread to handle accepting connections
         Thread connectionAcceptorThread = new Thread(new Runnable() {
             @Override
@@ -121,4 +128,5 @@ public class Peer {
         ConnectionManager.close_socket(peer_out);
         ConnectionManager.close_socket(peer_in);
     }
+
 }
