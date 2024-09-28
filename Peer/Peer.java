@@ -1,5 +1,6 @@
 package Peer;
 
+import Peer.Data.PacketType;
 import Peer.Messages.MessageReader;
 import Peer.Network.ConnectionManager;
 import Peer.Network.Packet;
@@ -53,9 +54,13 @@ public class Peer {
         }
         System.out.println("Connection successful");
 
-        Packet p = new Packet(name, msg);
+        Packet p = new Packet(name, msg, PacketType.MSG);
 
-        ConnectionManager.sendPacket(p, peer_out);
+        if(ConnectionManager.sendPacket(p, peer_out) == 0){
+            //write message to file
+            System.out.println("Writing message to file");
+            //TODO write message to file
+        }
 
         return 0;
     }

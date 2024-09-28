@@ -1,8 +1,10 @@
 package Peer.Messages;
+import Peer.Data.PacketType;
 import Peer.Network.Packet;
 
 import java.io.IOException;
 import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.net.Socket;
 
 public class MessageReader implements Runnable {
@@ -22,16 +24,20 @@ public class MessageReader implements Runnable {
     public void run() {
         try {
             boolean run = true;
+            ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
             ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
             Packet packet;
 
-            // Continuously read objects until the connection is closed
             while (running_status) {
-                // Print out the Packet details
                 System.out.println(YELLOW + "<------ Reading thread ------>"+ RESET);
+
                 packet = (Packet) in.readObject();
-                System.out.println(YELLOW + packet.sender + ": " + packet.message + RESET);
+                System.out.println(YELLOW + packet.get_sender() + ": " + packet.get_data() + RESET);
+                out.writeObject(new Packet(null, null, PacketType.ACK));
                 System.out.println(YELLOW + "<------ End of reading thread ------>" + RESET);
+                System.out.println("Writing message to file");
+                //TODO change file name
+                MessageLogger.write_message_log(packet.get_sender() + ": " + packet.get_data(), "teste");
             }
         } catch (IOException e) {
             System.out.println("Peer connection may have been closed unexpectedly");

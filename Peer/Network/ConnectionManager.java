@@ -1,7 +1,10 @@
 package Peer.Network;
 
+import Peer.Messages.MessageLogger;
+
 import java.io.Closeable;
 import java.io.IOException;
+import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -63,17 +66,33 @@ public class ConnectionManager {
      * Sends a packet to a peer with the specified socket
      * @param packet the packet to send
      * @param socket the socket used for packet transmission
+     * @return 0 if the sent packet was received -1 otherwise
      */
-    public static void sendPacket(Packet packet, Socket socket) {
+    public static int sendPacket(Packet packet, Socket socket) {
         try {
             ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
+            ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
             out.writeObject(packet);
             // Flush the stream to make sure the data is sent
             out.flush();
-
             System.out.println("Sent packet");
+
+            //program can be blocked here if an ack packet is never received
+            Packet ack = (Packet) in.readObject();
+
+            if(ack == null){
+                System.out.println("Did not receive ACK packet");
+                return -1;
+            }
+            System.out.println("Received ACK packet");
+            //TODO change file name
+            MessageLogger.write_message_log(packet.get_sender() + ": " +packet.get_data(), "teste");
+            return 0;
         } catch (IOException e) {
             System.out.println("Error sending packet: " + e.getMessage());
+            return -1;
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException(e);
         }
     }
 }
