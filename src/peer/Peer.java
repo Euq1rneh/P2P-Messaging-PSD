@@ -18,6 +18,8 @@ public class Peer {
     private ServerSocket peer_in;
     private Socket peer_out;
 
+    private String[] conversations;
+    
     public Peer(String name, int in_port, int out_port){
         this.name = name;
         this.in_port = in_port;
@@ -73,12 +75,19 @@ public class Peer {
      * @return 0 if could open the conversation -1 in case of error
      */
     public int open_conversation(int conversation_id){
-
-        return -1;
+    	String conversation = MessageLogger.read_message_log(conversations[conversation_id] + ".conversation");
+    	
+    	if(conversation == null) {
+    		return -1;
+    	}
+    	
+    	System.out.println(conversation);
+    	
+        return 0;
     }
 
     public void list_conversations(){
-        String[] conversations = MessageLogger.get_conversations();
+        conversations = MessageLogger.get_conversations();
         System.out.println("----------- Conversations -----------");
         if(conversations == null){
             System.out.println("No conversations were found.");

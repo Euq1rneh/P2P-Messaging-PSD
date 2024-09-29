@@ -60,13 +60,13 @@ public class MessageLogger {
 
     /**
      * Reads the message file
-     * @param filename the name of the file
+     * @param filename the name of the file (not the full path only the filename)
      */
     public static String read_message_log(String filename) {
         StringBuilder messageLog = new StringBuilder();
 
         // Use try-with-resources to ensure the file is closed automatically
-        try (BufferedReader reader = new BufferedReader(new FileReader(filename))) {
+        try (BufferedReader reader = new BufferedReader(new FileReader(CONVERSATION_DIR_PATH + filename))) {
             String line;
             while ((line = reader.readLine()) != null) {
                 messageLog.append(line).append(System.lineSeparator()); // Preserve line breaks
@@ -74,6 +74,7 @@ public class MessageLogger {
         } catch (IOException e) {
             // Handle any IOException that occurs while reading the file
             System.err.println("An error occurred while reading the message log: " + e.getMessage());
+            return null;
         }
 
         return messageLog.toString();

@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.net.Socket;
 import java.util.Scanner;
 
+import peer.messages.MessageLogger;
 import peer.network.ConnectionManager;
 
 public class Main {
@@ -83,6 +84,17 @@ public class Main {
                 }
             } else if (command.contains(":l")) {
                 peer.list_conversations();
+            }else if(command.contains(":o")) {
+            	String[] command_args = command.split(" ");
+            	if(command_args.length != 2) {
+            		System.out.println(GREEN + "Incorrect number of arguments" + RESET);
+                    System.out.println(GREEN + "<----- Main thread end ----->" + RESET);
+                    continue;
+            	}
+            	
+            	int conversation_id = Integer.parseInt(command_args[1]);
+            	peer.open_conversation(conversation_id);
+            	
             }
             sc.reset();
             System.out.println(GREEN + "<----- Main thread end ----->" + RESET);
