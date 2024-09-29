@@ -48,11 +48,21 @@ public class Peer {
     		return -1;
     	}
     	
+    	try {
+			out = new ObjectOutputStream(peer_out.getOutputStream());
+			in = new ObjectInputStream(peer_out.getInputStream());
+		} catch (IOException e) {
+			System.out.println("Could not create communication streams");
+			return -1;
+		}
+    	
     	return 0;
     }
     
     public void try_send_message() {
     	boolean is_writing = true;
+    	
+    	
     	
     	try(BufferedReader br = new BufferedReader(new InputStreamReader(System.in))){
     		while(is_writing) {
@@ -65,8 +75,9 @@ public class Peer {
     						break;
     				default:
     					// this could be changed later on if a server is used to store non delivered messages
-    					if(send_message(msg) == -1) {
+    					if(send_message(msg, in, out) == -1) {
     						is_writing = false;
+    						System.out.println("Error sending message or message was blank/empty");
     					}
     					break;
     				}
@@ -88,7 +99,7 @@ public class Peer {
      * @param peer_port the port of the peer that should receive the message
      * @return 0 if there was no error -1 otherwise
      */
-    private int send_message(String msg){
+    private int send_message(String msg, ObjectInputStream in, ObjectOutputStream out){
         if(msg == null || msg.isEmpty() || msg.isBlank()){
             System.out.println("No message was provided");
             return -1;
@@ -99,16 +110,7 @@ public class Peer {
             return -1;
         }
 
-        Packet p = new Packet(name, msg, PacketType.MSG);
-
-        try {
-			out = new ObjectOutputStream(peer_out.getOutputStream());
-			in = new ObjectInputStream(peer_out.getInputStream());
-		} catch (IOException e) {
-			System.out.println("Could not create communication streams");
-			System.exit(-1);
-		}
-        
+        Packet p = new Packet(name, msg, PacketType.MSG);        
         ConnectionManager.sendPacket(p, in, out);
 
         return 0;
