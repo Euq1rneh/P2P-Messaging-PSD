@@ -25,7 +25,6 @@ public class MessageReader implements Runnable {
     @Override
     public void run() {
         try {
-            boolean run = true;
             ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
             ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
             Packet packet;

@@ -80,6 +80,7 @@ public class ConnectionManager {
                 System.out.println("Did not receive ACK packet");
                 return -1;
             }
+            
             System.out.println("Received ACK packet");
             MessageLogger.write_message_log(packet.get_sender() + ": " +packet.get_data(), ack.get_sender() + ".conversation");
             return 0;

@@ -1,13 +1,7 @@
 package peer;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.net.Socket;
 import java.util.Scanner;
-
-import peer.messages.MessageLogger;
-import peer.network.ConnectionManager;
 
 public class Main {
 
@@ -26,7 +20,7 @@ public class Main {
         String in = sc.nextLine();
         int in_port = Integer.parseInt(in);
         System.out.print("Out Port: ");
-        String out = sc.nextLine();
+        String out = sc.nextLine(); // it need to be parsed like a string to avoid printing the initial menu twice
         int out_port = Integer.parseInt(out);
         
         Peer peer = new Peer(userName, in_port, out_port);
@@ -62,11 +56,11 @@ public class Main {
 //        	else {
 //        		System.out.printf("Command \"%s\" not recognized\n", command);
 //        	}
-        	try {
-				Thread.sleep(100);
-			} catch (InterruptedException e) {
-				e.printStackTrace();
-			}
+//        	try {
+//				Thread.sleep(100);
+//			} catch (InterruptedException e) {
+//				e.printStackTrace();
+//			}
         }
     }
 }

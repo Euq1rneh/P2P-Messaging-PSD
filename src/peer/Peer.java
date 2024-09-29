@@ -7,12 +7,9 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.net.SocketException;
-import java.util.Scanner;
 
 import peer.data.PacketType;
 import peer.messages.MessageLogger;
-import peer.messages.MessageReader;
 import peer.network.ConnectionManager;
 import peer.network.Packet;
 import peer.threads.ConnectionAcceptorThread;
@@ -62,8 +59,6 @@ public class Peer {
     public void try_send_message() {
     	boolean is_writing = true;
     	
-    	
-    	
     	try(BufferedReader br = new BufferedReader(new InputStreamReader(System.in))){
     		while(is_writing) {
         			System.out.print("Message > ");
@@ -72,8 +67,13 @@ public class Peer {
     				switch (msg) {
     					case ":b":
     						is_writing = false;
+    						out.close();
+    						in.close();
     						break;
     				default:
+    					if(msg.isBlank() || msg.isEmpty()) {
+    						break;
+    					}
     					// this could be changed later on if a server is used to store non delivered messages
     					if(send_message(msg, in, out) == -1) {
     						is_writing = false;
