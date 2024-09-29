@@ -14,7 +14,7 @@ public class MessageLogger {
     private static final String CONVERSATION_DIR_NAME = "conversations";
 
     public static void build_conversation_dir(){
-        File dir = new File(CONVERSATION_DIR_NAME);
+        File dir = new File("." + FileSystems.getDefault().getSeparator() + CONVERSATION_DIR_NAME);
 
         if (!dir.exists()) {
             boolean created = dir.mkdir();
@@ -25,7 +25,7 @@ public class MessageLogger {
     }
 
     public static String[] get_conversations(){
-        File conversations_dir = new File(CONVERSATION_DIR_NAME);
+        File conversations_dir = new File("." + FileSystems.getDefault().getSeparator() + CONVERSATION_DIR_NAME);
         if(!conversations_dir.exists()){
             return null;
         }
@@ -49,7 +49,7 @@ public class MessageLogger {
      * @param filename the file where the message should be written
      */
     public static void write_message_log(String message, String filename) {
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(CONVERSATION_DIR_PATH + filename, true))) {
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter("." + FileSystems.getDefault().getSeparator() + CONVERSATION_DIR_PATH + filename, true))) {
             writer.write(message);
             writer.newLine();
         } catch (IOException e) {
@@ -66,7 +66,7 @@ public class MessageLogger {
         StringBuilder messageLog = new StringBuilder();
 
         // Use try-with-resources to ensure the file is closed automatically
-        try (BufferedReader reader = new BufferedReader(new FileReader(CONVERSATION_DIR_PATH + filename))) {
+        try (BufferedReader reader = new BufferedReader(new FileReader("." + FileSystems.getDefault().getSeparator() + CONVERSATION_DIR_PATH + filename))) {
             String line;
             while ((line = reader.readLine()) != null) {
                 messageLog.append(line).append(System.lineSeparator()); // Preserve line breaks

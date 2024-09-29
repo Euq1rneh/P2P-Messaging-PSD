@@ -1,15 +1,21 @@
 package peer;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
+import java.util.Scanner;
 
 import peer.data.PacketType;
 import peer.messages.MessageLogger;
 import peer.messages.MessageReader;
 import peer.network.ConnectionManager;
 import peer.network.Packet;
+import peer.threads.ConnectionAcceptorThread;
 
 public class Peer {
     private String name;
@@ -17,6 +23,9 @@ public class Peer {
     private final int out_port;
     private ServerSocket peer_in;
     private Socket peer_out;
+    //streams used for sending messages
+    private ObjectOutputStream out; 
+    private ObjectInputStream in;
 
     private String[] conversations;
     
@@ -27,43 +36,80 @@ public class Peer {
     }
 
     /**
+     * Connect to another peer using their Ip and port
+     * @param address the ip address of the peer
+     * @param port the port of the peer
+     */
+    public int connect(String address, int port) {
+    	peer_out = ConnectionManager.try_connect_to_peer(address, port);
+    	
+    	if(peer_out == null) {
+    		System.out.printf("Could not establish connection to peer (%s:%d)\n", address, port);
+    		return -1;
+    	}
+    	
+    	return 0;
+    }
+    
+    public void try_send_message() {
+    	boolean is_writing = true;
+    	
+    	try(BufferedReader br = new BufferedReader(new InputStreamReader(System.in))){
+    		while(is_writing) {
+        			System.out.print("Message > ");
+    				String msg = br.readLine();
+    				
+    				switch (msg) {
+    					case ":b":
+    						is_writing = false;
+    						break;
+    				default:
+    					// this could be changed later on if a server is used to store non delivered messages
+    					if(send_message(msg) == -1) {
+    						is_writing = false;
+    					}
+    					break;
+    				}
+        	}	
+    	} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+    	
+    	
+    	
+    	
+    }
+    
+    /**
      * Sends the specified message to the specified peer (address + port)
      * @param msg the message to send
      * @param peer_address the ip address of the peer that should receive the message
      * @param peer_port the port of the peer that should receive the message
      * @return 0 if there was no error -1 otherwise
      */
-    public int send_message(String msg, String peer_address, int peer_port){
+    private int send_message(String msg){
         if(msg == null || msg.isEmpty() || msg.isBlank()){
             System.out.println("No message was provided");
             return -1;
         }
 
-        //############### This logic should be in the open_conversation method #######################
-        //should check if the ip and port match if so there is no need to disconect
-        if(peer_out != null && peer_out.isConnected()){
-            try {
-                peer_out.close();
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-        }
-
-        peer_out = ConnectionManager.try_connect_to_peer(peer_address, peer_port);
-
         if(peer_out == null){
-            System.out.printf("Could not establish connection to peer (%s:%d)\n", peer_address, peer_port);
+            System.out.println("Could not send message beacause you're not connected to a peer");
             return -1;
         }
-        System.out.println("Connection successful");
 
         Packet p = new Packet(name, msg, PacketType.MSG);
 
-        if(ConnectionManager.sendPacket(p, peer_out) == 0){
-            //write message to file
-            System.out.println("Writing message to file");
-            //TODO write message to file
-        }
+        try {
+			out = new ObjectOutputStream(peer_out.getOutputStream());
+			in = new ObjectInputStream(peer_out.getInputStream());
+		} catch (IOException e) {
+			System.out.println("Could not create communication streams");
+			System.exit(-1);
+		}
+        
+        ConnectionManager.sendPacket(p, in, out);
 
         return 0;
     }
@@ -92,12 +138,14 @@ public class Peer {
         if(conversations == null){
             System.out.println("No conversations were found.");
             System.out.println("Try starting a conversation by connecting to a peer and sending a message.");
+            System.out.println("------------------------------------");
             return;
         }
 
         for (int i = 0; i < conversations.length; i++) {
             System.out.printf("%d. %s\n", i, conversations[i]);
         }
+        System.out.println("------------------------------------");
     }
 
     /**
@@ -108,34 +156,15 @@ public class Peer {
         //2. start thread for accepting connections
 
         MessageLogger.build_conversation_dir();
+        peer_in = ConnectionManager.peer_server(in_port);
+        
+        if(peer_in == null) {
+        	System.out.println("Error while trying to initialize peer");
+        	System.exit(-1);
+        }
 
         // Create a thread to handle accepting connections
-        Thread connectionAcceptorThread = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                try (ServerSocket serverSocket = ConnectionManager.peer_server(in_port)) {
-                    peer_in = serverSocket;
-                    while (!serverSocket.isClosed()) {
-                        try {
-                            Socket clientSocket = serverSocket.accept();
-                            System.out.println("Accepted connection from peer" + clientSocket.getInetAddress().getHostAddress());
-
-                            new Thread(new MessageReader(name, clientSocket, running)).start();
-                        } catch (SocketException e) {
-                            // this exception hopefully will only be thrown when quiting the program
-                            // so there is no need to handle the error
-                        }catch (IOException e) {
-                            System.out.println("Error accepting connection");
-                            e.printStackTrace();
-                        }
-                    }
-                    System.out.println("Server socket closed");
-                } catch (IOException e) {
-                    System.out.println("There was an error while trying to start peer");
-                    e.printStackTrace();
-                }
-            }
-        });
+        ConnectionAcceptorThread connectionAcceptorThread = new ConnectionAcceptorThread(name, running, peer_in);
 
         // Start the thread that accepts connections
         connectionAcceptorThread.start();

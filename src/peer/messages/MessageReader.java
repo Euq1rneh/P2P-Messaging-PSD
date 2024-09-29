@@ -41,6 +41,7 @@ public class MessageReader implements Runnable {
                 //TODO change file name
                 MessageLogger.write_message_log(packet.get_sender() + ": " + packet.get_data(), packet.get_sender() + ".conversation");
             }
+            System.out.println("Not running");
         } catch (IOException e) {
             System.out.println("Peer connection may have been closed unexpectedly");
         } catch (ClassNotFoundException e) {

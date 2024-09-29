@@ -58,23 +58,19 @@ public class ConnectionManager {
      * @return the socket that allows communication with the peer or null if there was an error
      */
     public static Socket try_connect_to_peer(String peer_address, int peer_port){
-        System.out.printf("Trying to connect to %s:%d\n", peer_address, peer_port);
         return peer_client(peer_address, peer_port);
     }
 
     /**
      * Sends a packet to a peer with the specified socket
      * @param packet the packet to send
-     * @param socket the socket used for packet transmission
      * @return 0 if the sent packet was received -1 otherwise
      */
-    public static int sendPacket(Packet packet, Socket socket) {
+    public static int sendPacket(Packet packet, ObjectInputStream in, ObjectOutputStream out) {
         try {
-            ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
-            ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
             out.writeObject(packet);
             // Flush the stream to make sure the data is sent
-            out.flush();
+            //out.flush();
             System.out.println("Sent packet");
 
             //program can be blocked here if an ack packet is never received
