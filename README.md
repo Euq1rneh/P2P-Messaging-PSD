@@ -4,6 +4,5 @@ Uses java 21
 
 ## Commands
   - :q - quit
-  - :c - test connection
-  - :m ip port - send message
-  - :l - list all conversations
+  - :t ip port - send message
+  - :o conversation_id - opens a conversation with id conversation id
