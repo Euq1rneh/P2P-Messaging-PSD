@@ -5,4 +5,5 @@ Projeto de PSD
   - :q - quit
   - :c - test connection
   - :m ip port - send message
+  - :l - list all conversations
 
