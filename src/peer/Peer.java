@@ -86,10 +86,6 @@ public class Peer {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-    	
-    	
-    	
-    	
     }
     
     /**
