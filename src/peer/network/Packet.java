@@ -1,10 +1,10 @@
 package peer.network;
+import dataTypes.PacketType;
 
 import java.io.Serializable;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
-import peer.data.PacketType;
 
 public class Packet implements Serializable {
 

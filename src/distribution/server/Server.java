@@ -28,8 +28,7 @@ public class Server {
 				//cliSocket = (SSLSocket) srvSocket.accept();
 				cliSocket = (Socket) srvSocket.accept();
 				
-				System.out.println("--------> ACCEPTED CLIENT! CREATING NEW THREAD");
-				RequestManager newThread = new RequestManager(cliSocket);
+				RequestManager newThread = new RequestManager(cliSocket, running);
 				newThread.start();
 
 			} catch (IOException e) {

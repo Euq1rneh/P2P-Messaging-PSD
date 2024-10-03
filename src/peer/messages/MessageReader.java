@@ -5,7 +5,7 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
 
-import peer.data.PacketType;
+import dataTypes.PacketType;
 import peer.network.Packet;
 
 public class MessageReader implements Runnable {

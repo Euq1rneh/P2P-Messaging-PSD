@@ -8,7 +8,7 @@ import java.io.ObjectOutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 
-import peer.data.PacketType;
+import dataTypes.PacketType;
 import peer.messages.MessageLogger;
 import peer.network.ConnectionManager;
 import peer.network.Packet;
