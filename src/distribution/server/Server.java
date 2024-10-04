@@ -19,7 +19,7 @@ public class Server {
     }
 	
     
-    public void acceptClients(ServerSocket srvSocket) {
+    private static void acceptClients(ServerDataController sc, ServerSocket srvSocket) {
 		//SSLSocket cliSocket;
 		Socket cliSocket;
 
@@ -28,7 +28,7 @@ public class Server {
 				//cliSocket = (SSLSocket) srvSocket.accept();
 				cliSocket = (Socket) srvSocket.accept();
 				
-				RequestManager newThread = new RequestManager(cliSocket, running);
+				RequestManager newThread = new RequestManager(sc, cliSocket, running);
 				newThread.start();
 
 			} catch (IOException e) {
@@ -53,23 +53,9 @@ public class Server {
 			return;
 		}
 		
-		while (!s.isClosed()) {
-            try {
-                Socket clientSocket = s.accept();
-                System.out.println("Accepted connection from peer" + clientSocket.getInetAddress().getHostAddress());
-
-                
-                
-                
-            } catch (SocketException e) {
-                // this exception hopefully will only be thrown when quiting the program
-                // so there is no need to handle the error
-            }catch (IOException e) {
-                System.out.println("Error accepting connection");
-                e.printStackTrace();
-            }
-        }
-        System.out.println("Server socket closed");
+		ServerDataController serverDataController = new ServerDataController();
+		
+		acceptClients(serverDataController, s);
 
 	}
 

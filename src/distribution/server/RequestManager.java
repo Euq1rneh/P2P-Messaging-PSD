@@ -11,13 +11,15 @@ import dataTypes.PacketType;
 public class RequestManager extends Thread{
 	
 	private final Socket cliSocket;
+	private final ServerDataController sc;
 	private boolean running;
 	
 	
 	private ObjectOutputStream out;
 	private ObjectInputStream in;
 	
-	public RequestManager(Socket cliSocket, boolean running) {
+	public RequestManager(ServerDataController sc, Socket cliSocket, boolean running) {
+		this.sc = sc;
 		this.cliSocket = cliSocket;
 		
 		// create the streams for communication
@@ -47,8 +49,11 @@ public class RequestManager extends Thread{
 	
 	@Override
 	public void run() {
-		System.out.println("Client connection established");
 		boolean closed = false;
+		
+		System.out.println("Client connection established");
+		//add the client to the list of online clients 
+		//add the client pk to the list
 		
 		while(running && !closed) {
 			Packet p = readPacket();
@@ -58,7 +63,6 @@ public class RequestManager extends Thread{
 				continue;
 			}
 			
-			
 			switch (p.get_packet_type()) {
 			case PacketType.PEERS:
 				System.out.println("Retrieving a list of connected peers");
@@ -67,6 +71,7 @@ public class RequestManager extends Thread{
 				System.out.println("Retrieving pk from a peer");
 				break;
 			case PacketType.CLS:
+				//remove the peer from the lists (can keep the key???????)
 				closed = true;
 			default:
 				break;
