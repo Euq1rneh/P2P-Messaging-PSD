@@ -66,6 +66,10 @@ public class RequestManager extends Thread{
 			switch (p.get_packet_type()) {
 			case PacketType.PEERS:
 				System.out.println("Retrieving a list of connected peers");
+				if(sc.retrieve_peer_address("AAA") == null ) {
+					System.out.println("Error retrieving peer address");
+				}
+				
 				break;
 			case PacketType.PK_RET:
 				System.out.println("Retrieving pk from a peer");

@@ -12,18 +12,24 @@ public class ServerDataController {
 		peerPKs = new HashMap<String, String>();
 	}
 	
-	public void add_peer(String name, String address) {
-		// make the necessary checks
+	public int add_peer(String name, String address) {
+		if(onlinePeers.containsKey(name)) {
+			return -1;
+		}
 		onlinePeers.put(name, address);
+		return 0;
 	}
 	
 	public String retrieve_peer_address(String name) {
 		return onlinePeers.get(name); //can return null
 	}
 	
-	public void add_pk(String name, String pk) {
-		// make the necessary checks
+	public int add_pk(String name, String pk) {
+		if(peerPKs.containsKey(name)) {
+			return -1;
+		}
 		peerPKs.put(name, pk);
+		return 0;
 	}
 	
 	public String retrieve_peer_pk(String name) {
