@@ -1,4 +1,4 @@
-package peer.security;
+package peer.crypto;
 
 import java.io.UnsupportedEncodingException;
 import java.security.KeyPair;
@@ -11,7 +11,7 @@ import java.security.spec.InvalidKeySpecException;
 import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.PBEKeySpec;
 
-public class CryptoManager {
+public class KeyGenerator {
 
 	private static final int KEY_SIZE = 2048;
 	private static final int ITERATIONS = 2048;
