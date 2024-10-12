@@ -7,6 +7,8 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.security.KeyPair;
+import java.util.Base64;
 
 import dataTypes.PacketType;
 import peer.messages.MessageLogger;
@@ -26,10 +28,13 @@ public class Peer {
 
     private String[] conversations;
     
-    public Peer(String name, int in_port, int out_port){
+    private final KeyPair keys;
+    
+    public Peer(String name, int in_port, int out_port, KeyPair keys){
         this.name = name;
         this.in_port = in_port;
         this.out_port = out_port;
+        this.keys = keys;
     }
 
     /**

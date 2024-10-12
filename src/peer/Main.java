@@ -1,7 +1,13 @@
 package peer;
 
+import java.io.Console;
 import java.io.IOException;
+import java.security.KeyPair;
 import java.util.Scanner;
+
+import peer.crypto.KeyGenerator;
+
+
 
 public class Main {
 
@@ -13,9 +19,14 @@ public class Main {
 
     public static void main(String[] args) throws IOException {
 
-        Scanner sc = new Scanner(System.in);  // Create a Scanner object
+        Scanner sc = new Scanner(System.in);  // Create a Scanner object        
+        
         System.out.print("Enter name: ");
         String userName = sc.nextLine();  // Read user input
+        
+        System.out.print("Password: ");
+        String password = sc.nextLine();  // Read user input
+
         System.out.print("In Port: ");
         String in = sc.nextLine();
         int in_port = Integer.parseInt(in);
@@ -23,11 +34,21 @@ public class Main {
         String out = sc.nextLine(); // it need to be parsed like a string to avoid printing the initial menu twice
         int out_port = Integer.parseInt(out);
         
-        Peer peer = new Peer(userName, in_port, out_port);
+        KeyPair keys = KeyGenerator.generateRSAKeyPairFromPassword(password);
+        
+        if(keys == null) {
+        	System.out.println("Error generating cryptographic keys");
+        	return;
+        }
+        
+        Peer peer = new Peer(userName, in_port, out_port, keys);
 
+        // is this necessary?????
+        password = null;
+        keys = null;
+        
         peer.start(running);
         while(running) {
-        	//System.out.print("\033[H\033[2J");  // ANSI escape code to clear screen
         	peer.list_conversations();
         	
         	String command = sc.nextLine();  
