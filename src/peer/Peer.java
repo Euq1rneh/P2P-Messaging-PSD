@@ -28,13 +28,11 @@ public class Peer {
 
     private String[] conversations;
     
-    private final KeyPair keys;
     
-    public Peer(String name, int in_port, int out_port, KeyPair keys){
+    public Peer(String name, int in_port, int out_port){
         this.name = name;
         this.in_port = in_port;
         this.out_port = out_port;
-        this.keys = keys;
     }
 
     /**
