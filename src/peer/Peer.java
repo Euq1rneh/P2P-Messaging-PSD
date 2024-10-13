@@ -8,6 +8,7 @@ import java.io.ObjectOutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.security.KeyPair;
+import java.security.KeyStore;
 import java.util.Base64;
 
 import dataTypes.PacketType;
@@ -152,12 +153,13 @@ public class Peer {
     /**
      * Starts the peer by opening a socket that is responsible for accepting connections and reading the incoming messages
      */
-    public void start(boolean running){
+    public void start(boolean running, KeyStore keyStore, String password){
         //1. check for conversation dir
         //2. start thread for accepting connections
 
         MessageLogger.build_conversation_dir();
-        peer_in = ConnectionManager.peer_server(in_port);
+        //peer_in = ConnectionManager.peer_server(in_port);
+        peer_in = ConnectionManager.createServerSocket(in_port, keyStore, password);
         
         if(peer_in == null) {
         	System.out.println("Error while trying to initialize peer");

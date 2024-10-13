@@ -2,11 +2,9 @@ package peer;
 
 import java.io.Console;
 import java.io.IOException;
-import java.security.KeyPair;
 import java.security.KeyStore;
 import java.util.Scanner;
 
-import peer.crypto.KeyGenerator;
 import peer.crypto.Stores;
 
 public class Main {
@@ -16,12 +14,11 @@ public class Main {
 	static String CYAN = "\u001B[46m";
 
 	private static volatile boolean running = true;
-
 	private static KeyStore keystore;
 	
-	private static void configuration(Scanner sc) {
+	private static String configuration(Scanner sc) {
 		String response ="";
-    	
+		String password = "";
     	System.out.println("#################>Configuration<#################");
     	System.out.println("> Do you already have a keystore you would like to use?(y/N)");
     	response = sc.nextLine();
@@ -34,7 +31,7 @@ public class Main {
 			System.out.print("> Filepath:");
 			String path = sc.nextLine();
 			System.out.print("> Password:");
-			String password = sc.nextLine();
+			password = sc.nextLine();
 			System.out.println("> Trying to load keystore...");
 			keystore = Stores.tryLoadKeystore(path, password);
 			
@@ -57,12 +54,14 @@ public class Main {
 		}
     	
     	System.out.println("#################################################");
+    	//System.out.print("\033[H\033[2J"); // works with git bash(ANSI code for clearing the screen)
+    	return password;
     }
 
 	public static void main(String[] args) throws IOException {
 		Scanner sc = new Scanner(System.in); // Create a Scanner object
 
-		configuration(sc);
+		String password = configuration(sc);
 		
 		System.out.print("Enter name: ");
 		String userName = sc.nextLine(); // Read user input
@@ -76,7 +75,10 @@ public class Main {
 
 		Peer peer = new Peer(userName, in_port, out_port);
 
-		peer.start(running);
+		peer.start(running, keystore, password);
+		
+		password = "";
+		
 		while (running) {
 			peer.list_conversations();
 

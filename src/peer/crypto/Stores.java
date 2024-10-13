@@ -87,7 +87,6 @@ public class Stores {
 			if (!metRequirements) {
 				System.out.println("Keystore password is too short - must be at least 6 characters");
 			}
-			System.out.print("\033[H\033[2J"); // might not work (ANSI code for clearing the screen)
 		} while (!match || !metRequirements);
 
 		System.out.print("Enter your first and last name (CN): ");
