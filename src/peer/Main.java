@@ -15,12 +15,12 @@ public class Main {
 
 	private static volatile boolean running = true;
 	private static KeyStore keystore;
+	private static KeyStore truststore;
 	
-	private static String configuration(Scanner sc) {
+	private static String keyStoreConfiguration(Scanner sc) {
 		String response ="";
 		String password = "";
-    	System.out.println("#################>Configuration<#################");
-    	System.out.println("> Do you already have a keystore you would like to use?(y/N)");
+		System.out.println("> Do you already have a keystore you would like to use?(y/N)");
     	response = sc.nextLine();
     	
     	switch (response) {
@@ -52,16 +52,96 @@ public class Main {
 			System.out.println("> Keystore generation process finished successfully\n> Finishing configuration...");
 			break;
 		}
+    	return password;
+	}
+	
+	private static void loadAditionalCerts(Scanner sc, String password) {
+		String certDirPath = "";
+		String response = "";
+		System.out.println("> Do you have certificates you would like to load?(y/N)");
+		
+		switch (response) {
+    	case "":
+    	case "Y":
+		case "y":
+			System.out.println("> Directory Path:");
+			certDirPath = sc.nextLine();
+			
+			Stores.addCertificates(truststore, certDirPath, password);
+			break;
+		case "N":
+		case "n":
+			
+			break;
+		}
+		
+	}
+	
+	private static String trustStoreConfiguration(Scanner sc) {
+		String response ="";
+		String password = "";
+		System.out.println("> Do you already have a truststore you would like to use?(y/N)");
+    	response = sc.nextLine();
     	
+    	switch (response) {
+    	case "":
+    	case "Y":
+		case "y":
+			System.out.println("Starting load process...");
+			System.out.print("> Filepath:");
+			String path = sc.nextLine();
+			System.out.print("> Password:");
+			password = sc.nextLine();
+			System.out.println("> Trying to load truststore...");
+			truststore = Stores.tryLoadTrustStore(path, password);
+			
+			if(truststore == null) {
+				System.out.println("> Exiting programm");
+				System.exit(-1);
+			}
+			
+			loadAditionalCerts(sc, password);
+			
+			System.out.println("> Truststore loading process finished successfully\n> Finishing configuration...");
+			break;
+		case "N":
+		case "n":
+			System.out.println("> Starting truststore generation process...");
+			truststore = Stores.generateTrustStore();
+			if(truststore == null) {
+				System.out.println("> Error while trying to generate truststore\n> Exiting programm");
+				System.exit(-1);
+			}
+			System.out.println("> Filepath:");
+			response = sc.nextLine();
+			System.out.println("> Password (can be empty, this is not recommended):");
+			password = sc.nextLine();
+			
+			loadAditionalCerts(sc, password);
+			
+			Stores.saveTrustStore(truststore, response, password);
+			System.out.println("> Truststore generation process finished successfully\n> Finishing configuration...");
+			break;
+		}
+    	return password;
+	}
+	
+	private static String[] configuration(Scanner sc) {
+		
+		String[] passwords = new String[2];
+		
+    	System.out.println("#################>Configuration<#################");
+    	passwords[0] = keyStoreConfiguration(sc);
+    	passwords[1] = trustStoreConfiguration(sc);
     	System.out.println("#################################################");
     	//System.out.print("\033[H\033[2J"); // works with git bash(ANSI code for clearing the screen)
-    	return password;
+    	return passwords;
     }
 
 	public static void main(String[] args) throws IOException {
 		Scanner sc = new Scanner(System.in); // Create a Scanner object
 
-		String password = configuration(sc);
+		String[] passwords = configuration(sc);
 		
 		System.out.print("Enter name: ");
 		String userName = sc.nextLine(); // Read user input
@@ -75,9 +155,7 @@ public class Main {
 
 		Peer peer = new Peer(userName, in_port, out_port);
 
-		peer.start(running, keystore, password);
-		
-		password = "";
+		peer.start(running, keystore, passwords[0]);
 		
 		while (running) {
 			peer.list_conversations();
