@@ -6,6 +6,7 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.UnknownHostException;
 import java.security.KeyManagementException;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
@@ -16,6 +17,10 @@ import javax.net.ssl.KeyManager;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLServerSocketFactory;
+import javax.net.ssl.SSLSocket;
+import javax.net.ssl.SSLSocketFactory;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.TrustManagerFactory;
 
 import peer.messages.MessageLogger;
 
@@ -31,7 +36,9 @@ public class ConnectionManager {
 	}
 
 	public static ServerSocket createServerSocket(int port, KeyStore store, String password) {
-
+		
+		System.out.println("Password:" + password);
+		
 		try {
 			KeyManagerFactory keyManager = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
 			keyManager.init(store, password.toCharArray());
@@ -70,6 +77,48 @@ public class ConnectionManager {
 			return null;
 		}
 	}
+	
+	private static SSLSocket peerClient(KeyStore keyStore, String password, KeyStore trustStore, String address, int port) {
+		
+		try {
+			KeyManagerFactory keyManager = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+			keyManager.init(keyStore, password.toCharArray());
+			KeyManager[] keyManagers = keyManager.getKeyManagers();
+
+			TrustManagerFactory trustManager = TrustManagerFactory
+					.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+			trustManager.init(trustStore);
+			
+			TrustManager[] trustManagers = trustManager.getTrustManagers();
+
+			SSLContext sslContext = SSLContext.getInstance("TLS");
+			sslContext.init(keyManagers, trustManagers, null);
+
+			SSLSocketFactory socketFactory = sslContext.getSocketFactory();
+			SSLSocket clientSocket = (SSLSocket) socketFactory.createSocket(address, port);
+			
+			return clientSocket;
+		} catch (NoSuchAlgorithmException e) {
+			e.printStackTrace();
+			return null;
+		} catch (UnrecoverableKeyException e) {
+			e.printStackTrace();
+			return null;
+		} catch (KeyStoreException e) {
+			e.printStackTrace();
+			return null;
+		} catch (KeyManagementException e) {
+			e.printStackTrace();
+			return null;
+		} catch (UnknownHostException e) {
+			e.printStackTrace();
+			return null;
+		} catch (IOException e) {
+			e.printStackTrace();
+			return null;
+		}
+		
+	}
 
 	/**
 	 * Closes the socket passed as an argument
@@ -96,8 +145,9 @@ public class ConnectionManager {
 	 * @return the socket that allows communication with the peer or null if there
 	 *         was an error
 	 */
-	public static Socket try_connect_to_peer(String peer_address, int peer_port) {
-		return peer_client(peer_address, peer_port);
+	public static SSLSocket try_connect_to_peer(KeyStore keyStore, String password, KeyStore trustStore, String peer_address, int peer_port) {
+		//return peer_client(peer_address, peer_port);
+		return peerClient(keyStore, password, trustStore, peer_address, peer_port);
 	}
 
 	/**

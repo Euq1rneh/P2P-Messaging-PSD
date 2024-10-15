@@ -155,7 +155,7 @@ public class Main {
 		String out = sc.nextLine(); // it need to be parsed like a string to avoid printing the initial menu twice
 		int out_port = Integer.parseInt(out);
 
-		Peer peer = new Peer(userName, in_port, out_port);
+		Peer peer = new Peer(userName, in_port, out_port, keystore, truststore, passwords[0]);
 
 		peer.start(running, keystore, passwords[0]);
 		

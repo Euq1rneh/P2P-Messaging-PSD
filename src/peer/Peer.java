@@ -29,11 +29,17 @@ public class Peer {
 
     private String[] conversations;
     
+    private KeyStore keyStore;
+    private KeyStore trustStore;
+    private String password;
     
-    public Peer(String name, int in_port, int out_port){
+    public Peer(String name, int in_port, int out_port, KeyStore keyStore, KeyStore trustStore, String password){
         this.name = name;
         this.in_port = in_port;
         this.out_port = out_port;
+        this.keyStore = keyStore;
+        this.trustStore = trustStore;
+        this.password = password; // this can probably be removed if the trustmanagers for socket creation are always the same
     }
 
     /**
@@ -42,7 +48,9 @@ public class Peer {
      * @param port the port of the peer
      */
     public int connect(String address, int port) {
-    	peer_out = ConnectionManager.try_connect_to_peer(address, port);
+//    	peer_out = ConnectionManager.try_connect_to_peer(address, port);
+    	
+    	peer_out = ConnectionManager.try_connect_to_peer(keyStore, password, trustStore, address, port);
     	
     	if(peer_out == null) {
     		System.out.printf("Could not establish connection to peer (%s:%d)\n", address, port);
@@ -153,13 +161,11 @@ public class Peer {
     /**
      * Starts the peer by opening a socket that is responsible for accepting connections and reading the incoming messages
      */
-    public void start(boolean running, KeyStore keyStore, String password){
-        //1. check for conversation dir
-        //2. start thread for accepting connections
-
+    public void start(boolean running, KeyStore keyStore, String password){   	
+    	
         MessageLogger.build_conversation_dir();
         //peer_in = ConnectionManager.peer_server(in_port);
-        peer_in = ConnectionManager.createServerSocket(in_port, keyStore, password);
+        peer_in = ConnectionManager.createServerSocket(in_port, keyStore, this.password);
         
         if(peer_in == null) {
         	System.out.println("Error while trying to initialize peer");
