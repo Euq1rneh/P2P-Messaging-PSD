@@ -18,7 +18,7 @@ public class Main {
 	private static KeyStore truststore;
 	
 	private static String keyStoreConfiguration(Scanner sc) {
-		String response ="";
+		String response =null;
 		String password = "";
 		System.out.println("> Do you already have a keystore you would like to use?(y/N)");
     	response = sc.nextLine();
@@ -58,7 +58,9 @@ public class Main {
 	private static void loadAditionalCerts(Scanner sc, String password) {
 		String certDirPath = "";
 		String response = "";
+		
 		System.out.println("> Do you have certificates you would like to load?(y/N)");
+		response = sc.nextLine();
 		
 		switch (response) {
     	case "":
@@ -101,7 +103,7 @@ public class Main {
 			}
 			
 			loadAditionalCerts(sc, password);
-			
+			Stores.saveTrustStore(truststore, path, password);
 			System.out.println("> Truststore loading process finished successfully\n> Finishing configuration...");
 			break;
 		case "N":

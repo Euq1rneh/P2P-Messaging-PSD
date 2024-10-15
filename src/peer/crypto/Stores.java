@@ -214,7 +214,7 @@ public class Stores {
 		KeyStore trustStore;
 
 		try (FileInputStream is = new FileInputStream(path)) {
-			trustStore = KeyStore.getInstance("JKS");
+			trustStore = KeyStore.getInstance("JCEKS");
 			trustStore.load(is, keystorePassword.toCharArray());
 		} catch (NoSuchAlgorithmException e) {
 			e.printStackTrace();
@@ -245,8 +245,9 @@ public class Stores {
         return false;
     }
 	
-	public static void addAllCertificatesFromDirectory(KeyStore trustStore, String directoryPath) throws Exception {
+	private static void addAllCertificatesFromDirectory(KeyStore trustStore, String directoryPath) throws Exception {
 		File directory = new File(directoryPath);
+		
 		if (!directory.exists() || !directory.isDirectory()) {
 			System.out.println("Invalid directory path: " + directoryPath);
 			return;
@@ -285,6 +286,11 @@ public class Stores {
 	}
 
 	public static void addCertificates(KeyStore truststore, String dirPath, String keystorePassword) {
-		
+		try {
+			addAllCertificatesFromDirectory(truststore, dirPath);
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 	}
 }
