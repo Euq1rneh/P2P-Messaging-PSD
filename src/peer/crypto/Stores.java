@@ -1,5 +1,6 @@
 package peer.crypto;
 
+import java.awt.RenderingHints.Key;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
@@ -11,6 +12,7 @@ import java.io.OutputStream;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
+import java.security.PublicKey;
 import java.security.KeyStore.ProtectionParameter;
 import java.security.KeyStore.SecretKeyEntry;
 import java.security.cert.Certificate;
@@ -309,5 +311,16 @@ public class Stores {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
+	}
+	
+	public static PublicKey retrievePublicKey(KeyStore truststore, String alias) {
+		
+		try {
+			return truststore.getCertificate(alias).getPublicKey();
+		} catch (KeyStoreException e) {
+			e.printStackTrace();
+		}
+		
+		return null;
 	}
 }

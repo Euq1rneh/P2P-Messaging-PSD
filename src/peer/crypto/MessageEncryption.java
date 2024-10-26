@@ -158,8 +158,15 @@ public class MessageEncryption {
 	    return null;
 	}
 	
-	public static SecretKeySpec generatePBKDF2(String password, byte[] salt, int iterations) {
+	public static SecretKeySpec generatePBKDF2(String password) {
 	    try {
+	    	SecureRandom sr = new SecureRandom();
+	    	
+	    	byte[] salt = new byte[256/8]; //these 2 numbers can be randomized
+	    	sr.nextBytes(salt);
+	    	
+	    	int iterations = sr.nextInt(101);
+	    	
 	        SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
 	        KeySpec spec = new PBEKeySpec(password.toCharArray(), salt, iterations, 256); // 256-bit key length
 	        SecretKey tmp = factory.generateSecret(spec);
@@ -203,13 +210,23 @@ public class MessageEncryption {
 	}
 	
 	
-    public static String encrypt(String data, PublicKey publicKey) throws Exception {
-        Cipher cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding");
-        cipher.init(Cipher.ENCRYPT_MODE, publicKey);
-        byte[] encryptedData = cipher.doFinal(data.getBytes(StandardCharsets.UTF_8));
-        String encryptedBase64 = Base64.getEncoder().encodeToString(encryptedData);
-        System.out.println("Encrypted (Base64): " + encryptedBase64);
-        return encryptedBase64;
+    public static String encrypt(String data, PublicKey publicKey) {
+        try {
+        	Cipher cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding");
+			cipher.init(Cipher.ENCRYPT_MODE, publicKey);
+	        byte[] encryptedData = cipher.doFinal(data.getBytes(StandardCharsets.UTF_8));
+	        String encryptedBase64 = Base64.getEncoder().encodeToString(encryptedData);
+	        System.out.println("Encrypted (Base64): " + encryptedBase64);
+	        return encryptedBase64;
+		} catch (NoSuchAlgorithmException 
+				| NoSuchPaddingException 
+				| InvalidKeyException 
+				| IllegalBlockSizeException 
+				| BadPaddingException e) {
+			e.printStackTrace();
+		}
+        
+        return null;
     }
 
     // Decrypt data using the private key

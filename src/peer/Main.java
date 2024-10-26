@@ -154,9 +154,11 @@ public class Main {
 		String out = sc.nextLine(); // it need to be parsed like a string to avoid printing the initial menu twice
 		int out_port = Integer.parseInt(out);
 
-		Peer peer = new Peer(userName, in_port, out_port, keystore, truststore);
+		Peer peer = new Peer(userName, in_port, out_port, keystore, truststore, password);
 		peer.createTrustManager(password, keystore, truststore);
 		peer.start(running, keystore, password);
+		
+		password = "";
 		
 		while (running) {
 			peer.list_conversations();
@@ -171,8 +173,9 @@ public class Main {
 			} else if (command_args[0].equals(":t")) {
 				String address = command_args[1];
 				int port = Integer.parseInt(command_args[2]);
+				String alias = command_args[3];
 				peer.connect(address, port);
-				peer.try_send_message();
+				peer.try_send_message(sc, alias);
 			} else if (command_args[0].equals(":o")) {
 				int conversation_id = Integer.parseInt(command_args[1]);
 				peer.open_conversation(conversation_id);

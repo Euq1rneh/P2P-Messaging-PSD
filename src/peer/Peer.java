@@ -11,10 +11,12 @@ import java.security.KeyPair;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
+import java.security.PublicKey;
 import java.security.UnrecoverableKeyException;
 import java.util.Base64;
 import java.util.Scanner;
 
+import javax.crypto.SecretKey;
 import javax.net.ssl.KeyManager;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.TrustManager;
@@ -22,6 +24,7 @@ import javax.net.ssl.TrustManagerFactory;
 
 import dataTypes.PacketType;
 import peer.crypto.MessageEncryption;
+import peer.crypto.Stores;
 import peer.messages.MessageLogger;
 import peer.network.ConnectionManager;
 import peer.network.Packet;
@@ -41,15 +44,18 @@ public class Peer {
 
 	private KeyStore keyStore;
 	private KeyStore trustStore;
+	private String password;
+	
 	KeyManager[] keyManagers;
 	TrustManager[] trustManagers;
 
-	public Peer(String name, int in_port, int out_port, KeyStore keyStore, KeyStore trustStore) {
+	public Peer(String name, int in_port, int out_port, KeyStore keyStore, KeyStore trustStore, String password) {
 		this.name = name;
 		this.in_port = in_port;
 		this.out_port = out_port;
 		this.keyStore = keyStore;
 		this.trustStore = trustStore;
+		this.password = password;
 	}
 
 	/**
@@ -80,7 +86,7 @@ public class Peer {
 		return 0;
 	}
 
-	public void try_send_message(Scanner sc) {
+	public void try_send_message(Scanner sc, String alias) {
 		boolean is_writing = true;
 		
 		while (is_writing) {
@@ -95,9 +101,32 @@ public class Peer {
 				if (msg.isBlank() || msg.isEmpty()) {
 					break;
 				}
+				
+				PublicKey pk;
+				SecretKey k;
+				String encMsg;
+				String packet = name + "{@}" + msg + "{@}MSG";
+				
+				if((k = checkForEncryptionKey(sc, alias, password)) == null) {
+					return;
+				}
+				
+				if((encMsg = MessageEncryption.encriptDataWithSymetricKey(k, packet.getBytes())) == null) {
+					return;
+				}
+				
+				if((pk = Stores.retrievePublicKey(trustStore, alias)) == null) {
+					return;
+				}
+				
+				if((encMsg = MessageEncryption.encrypt(encMsg, pk))== null) {
+					return;
+				}
+				
+				
 				// this could be changed later on if a server is used to store non delivered
 				// messages
-				if (send_message(msg, in, out) == -1) {
+				if (send_message(encMsg, in, out) == -1) {
 					is_writing = false;
 					System.out.println("Error sending message or message was blank/empty");
 				}
@@ -133,15 +162,36 @@ public class Peer {
 			return -1;
 		}
 
-		//change packet to be a single string that contains all the same information as the packet
-		// or find a way to encrypt it while leaving the name out
-		String packet = name + "{@}" + msg + "{@}" + PacketType.MSG.toString();		
-		MessageEncryption.encriptMessage(null, packet);
+		//TODO find a way to get the alias of the key and password for the keyStore
+		String alias = ""; // alias of the person the message is going to 
+		String password = ""; // password of the keyStore
+		
 		
 		//Packet p = new Packet(name, msg, PacketType.MSG);
-		ConnectionManager.sendPacket(packet, in, out);
+		ConnectionManager.sendPacket(msg, in, out);
 
 		return 0;
+	}
+	
+	
+	private SecretKey checkForEncryptionKey(Scanner sc, String alias, String password) {
+		try {
+			
+			SecretKey k = (SecretKey) keyStore.getKey(alias, password.toCharArray()); 
+			
+			if(k == null) {
+				System.out.print("> Password (PBE): \n");
+				String password4Key = sc.nextLine();
+				
+				k = MessageEncryption.generatePBKDF2(password4Key);
+				password4Key = "";
+			}
+			
+			return k;
+		} catch (UnrecoverableKeyException | KeyStoreException |NoSuchAlgorithmException e) {
+			e.printStackTrace();
+		}
+		return null;
 	}
 
 	/**
