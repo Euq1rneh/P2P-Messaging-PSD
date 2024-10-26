@@ -9,179 +9,222 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.security.KeyPair;
 import java.security.KeyStore;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
+import java.security.UnrecoverableKeyException;
 import java.util.Base64;
+import java.util.Scanner;
+
+import javax.net.ssl.KeyManager;
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.TrustManagerFactory;
 
 import dataTypes.PacketType;
+import peer.crypto.MessageEncryption;
 import peer.messages.MessageLogger;
 import peer.network.ConnectionManager;
 import peer.network.Packet;
 import peer.threads.ConnectionAcceptorThread;
 
 public class Peer {
-    private String name;
-    private final int in_port;
-    private final int out_port;
-    private ServerSocket peer_in;
-    private Socket peer_out;
-    //streams used for sending messages
-    private ObjectOutputStream out; 
-    private ObjectInputStream in;
+	private String name;
+	private final int in_port;
+	private final int out_port;
+	private ServerSocket peer_in;
+	private Socket peer_out;
+	// streams used for sending messages
+	private ObjectOutputStream out;
+	private ObjectInputStream in;
 
-    private String[] conversations;
-    
-    private KeyStore keyStore;
-    private KeyStore trustStore;
-    private String password;
-    
-    public Peer(String name, int in_port, int out_port, KeyStore keyStore, KeyStore trustStore, String password){
-        this.name = name;
-        this.in_port = in_port;
-        this.out_port = out_port;
-        this.keyStore = keyStore;
-        this.trustStore = trustStore;
-        this.password = password; // this can probably be removed if the trustmanagers for socket creation are always the same
-    }
+	private String[] conversations;
 
-    /**
-     * Connect to another peer using their Ip and port
-     * @param address the ip address of the peer
-     * @param port the port of the peer
-     */
-    public int connect(String address, int port) {
+	private KeyStore keyStore;
+	private KeyStore trustStore;
+	KeyManager[] keyManagers;
+	TrustManager[] trustManagers;
+
+	public Peer(String name, int in_port, int out_port, KeyStore keyStore, KeyStore trustStore) {
+		this.name = name;
+		this.in_port = in_port;
+		this.out_port = out_port;
+		this.keyStore = keyStore;
+		this.trustStore = trustStore;
+	}
+
+	/**
+	 * Connect to another peer using their Ip and port
+	 * 
+	 * @param address the ip address of the peer
+	 * @param port    the port of the peer
+	 */
+	public int connect(String address, int port) {
 //    	peer_out = ConnectionManager.try_connect_to_peer(address, port);
-    	
-    	peer_out = ConnectionManager.try_connect_to_peer(keyStore, password, trustStore, address, port);
-    	
-    	if(peer_out == null) {
-    		System.out.printf("Could not establish connection to peer (%s:%d)\n", address, port);
-    		return -1;
-    	}
-    	
-    	try {
+
+		peer_out = ConnectionManager.try_connect_to_peer(keyStore, trustStore, keyManagers, trustManagers, address,
+				port);
+
+		if (peer_out == null) {
+			System.out.printf("Could not establish connection to peer (%s:%d)\n", address, port);
+			return -1;
+		}
+
+		try {
 			out = new ObjectOutputStream(peer_out.getOutputStream());
 			in = new ObjectInputStream(peer_out.getInputStream());
 		} catch (IOException e) {
 			System.out.println("Could not create communication streams");
 			return -1;
 		}
-    	
-    	return 0;
-    }
-    
-    public void try_send_message() {
-    	boolean is_writing = true;
-    	
-    	try(BufferedReader br = new BufferedReader(new InputStreamReader(System.in))){
-    		while(is_writing) {
-        			System.out.print("Message > ");
-    				String msg = br.readLine();
-    				
-    				switch (msg) {
-    					case ":b":
-    						is_writing = false;
-    						out.close();
-    						in.close();
-    						break;
-    				default:
-    					if(msg.isBlank() || msg.isEmpty()) {
-    						break;
-    					}
-    					// this could be changed later on if a server is used to store non delivered messages
-    					if(send_message(msg, in, out) == -1) {
-    						is_writing = false;
-    						System.out.println("Error sending message or message was blank/empty");
-    					}
-    					break;
-    				}
-        	}	
-    	} catch (IOException e) {
-			// TODO Auto-generated catch block
+
+		return 0;
+	}
+
+	public void try_send_message(Scanner sc) {
+		boolean is_writing = true;
+		
+		while (is_writing) {
+			System.out.print("Message > ");
+			String msg = sc.nextLine();
+
+			switch (msg) {
+			case ":b":
+				is_writing = false;
+				break;
+			default:
+				if (msg.isBlank() || msg.isEmpty()) {
+					break;
+				}
+				// this could be changed later on if a server is used to store non delivered
+				// messages
+				if (send_message(msg, in, out) == -1) {
+					is_writing = false;
+					System.out.println("Error sending message or message was blank/empty");
+				}
+				break;
+			}
+		}
+
+		try {
+			out.close();
+			in.close();
+		}catch (IOException e) {
+			System.out.println("Error closing output and input buffers");
+		}
+	}
+
+	/**
+	 * Sends the specified message to the specified peer (address + port)
+	 * 
+	 * @param msg          the message to send
+	 * @param peer_address the ip address of the peer that should receive the
+	 *                     message
+	 * @param peer_port    the port of the peer that should receive the message
+	 * @return 0 if there was no error -1 otherwise
+	 */
+	private int send_message(String msg, ObjectInputStream in, ObjectOutputStream out) {
+		if (msg == null || msg.isEmpty() || msg.isBlank()) {
+			System.out.println("No message was provided");
+			return -1;
+		}
+
+		if (peer_out == null) {
+			System.out.println("Could not send message beacause you're not connected to a peer");
+			return -1;
+		}
+
+		//change packet to be a single string that contains all the same information as the packet
+		// or find a way to encrypt it while leaving the name out
+		String packet = name + "{@}" + msg + "{@}" + PacketType.MSG.toString();		
+		MessageEncryption.encriptMessage(null, packet);
+		
+		//Packet p = new Packet(name, msg, PacketType.MSG);
+		ConnectionManager.sendPacket(packet, in, out);
+
+		return 0;
+	}
+
+	/**
+	 * Open a conversation with a peer if a conversation does not exist it creates a
+	 * new one. This method is also responsible for connecting to the peer?????
+	 * 
+	 * @param conversation_id the id of the conversation to open
+	 * @return 0 if could open the conversation -1 in case of error
+	 */
+	public int open_conversation(int conversation_id) {
+		String conversation = MessageLogger.read_message_log(conversations[conversation_id] + ".conversation");
+
+		if (conversation == null) {
+			return -1;
+		}
+
+		System.out.println(conversation);
+
+		return 0;
+	}
+
+	public void list_conversations() {
+		conversations = MessageLogger.get_conversations();
+		System.out.println("----------- Conversations -----------");
+		if (conversations == null) {
+			System.out.println("No conversations were found.");
+			System.out.println("Try starting a conversation by connecting to a peer and sending a message.");
+			System.out.println("------------------------------------");
+			return;
+		}
+
+		for (int i = 0; i < conversations.length; i++) {
+			System.out.printf("%d. %s\n", i, conversations[i]);
+		}
+		System.out.println("------------------------------------");
+	}
+
+	public void createTrustManager(String kpassword, KeyStore keystore, KeyStore truststore) {
+		KeyManagerFactory keyManager;
+		try {
+			keyManager = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+			keyManager.init(keystore, kpassword.toCharArray());
+			keyManagers = keyManager.getKeyManagers();
+
+			TrustManagerFactory trustManager = TrustManagerFactory
+					.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+			trustManager.init(truststore);
+			trustManagers = trustManager.getTrustManagers();
+		} catch (NoSuchAlgorithmException e) {
+			e.printStackTrace();
+		} catch (UnrecoverableKeyException e) {
+			e.printStackTrace();
+		} catch (KeyStoreException e) {
 			e.printStackTrace();
 		}
-    }
-    
-    /**
-     * Sends the specified message to the specified peer (address + port)
-     * @param msg the message to send
-     * @param peer_address the ip address of the peer that should receive the message
-     * @param peer_port the port of the peer that should receive the message
-     * @return 0 if there was no error -1 otherwise
-     */
-    private int send_message(String msg, ObjectInputStream in, ObjectOutputStream out){
-        if(msg == null || msg.isEmpty() || msg.isBlank()){
-            System.out.println("No message was provided");
-            return -1;
-        }
 
-        if(peer_out == null){
-            System.out.println("Could not send message beacause you're not connected to a peer");
-            return -1;
-        }
+	}
 
-        Packet p = new Packet(name, msg, PacketType.MSG);        
-        ConnectionManager.sendPacket(p, in, out);
+	/**
+	 * Starts the peer by opening a socket that is responsible for accepting
+	 * connections and reading the incoming messages
+	 */
+	public void start(boolean running, KeyStore keyStore, String password) {
 
-        return 0;
-    }
+		MessageLogger.build_conversation_dir();
+		// peer_in = ConnectionManager.peer_server(in_port);
+		peer_in = ConnectionManager.createServerSocket(in_port, keyStore, keyManagers, trustManagers);
 
-    /**
-     * Open a conversation with a peer if a conversation does not exist it creates a new one.
-     * This method is also responsible for connecting to the peer?????
-     * @param conversation_id the id of the conversation to open
-     * @return 0 if could open the conversation -1 in case of error
-     */
-    public int open_conversation(int conversation_id){
-    	String conversation = MessageLogger.read_message_log(conversations[conversation_id] + ".conversation");
-    	
-    	if(conversation == null) {
-    		return -1;
-    	}
-    	
-    	System.out.println(conversation);
-    	
-        return 0;
-    }
+		if (peer_in == null) {
+			System.out.println("Error while trying to initialize peer");
+			System.exit(-1);
+		}
 
-    public void list_conversations(){
-        conversations = MessageLogger.get_conversations();
-        System.out.println("----------- Conversations -----------");
-        if(conversations == null){
-            System.out.println("No conversations were found.");
-            System.out.println("Try starting a conversation by connecting to a peer and sending a message.");
-            System.out.println("------------------------------------");
-            return;
-        }
+		// Create a thread to handle accepting connections
+		ConnectionAcceptorThread connectionAcceptorThread = new ConnectionAcceptorThread(name, running, peer_in);
 
-        for (int i = 0; i < conversations.length; i++) {
-            System.out.printf("%d. %s\n", i, conversations[i]);
-        }
-        System.out.println("------------------------------------");
-    }
+		// Start the thread that accepts connections
+		connectionAcceptorThread.start();
+	}
 
-    /**
-     * Starts the peer by opening a socket that is responsible for accepting connections and reading the incoming messages
-     */
-    public void start(boolean running, KeyStore keyStore, String password){   	
-    	
-        MessageLogger.build_conversation_dir();
-        //peer_in = ConnectionManager.peer_server(in_port);
-        peer_in = ConnectionManager.createServerSocket(in_port, keyStore, this.password);
-        
-        if(peer_in == null) {
-        	System.out.println("Error while trying to initialize peer");
-        	System.exit(-1);
-        }
-
-        // Create a thread to handle accepting connections
-        ConnectionAcceptorThread connectionAcceptorThread = new ConnectionAcceptorThread(name, running, peer_in);
-
-        // Start the thread that accepts connections
-        connectionAcceptorThread.start();
-    }
-
-    public void close(){
-        ConnectionManager.close_socket(peer_out);
-        ConnectionManager.close_socket(peer_in);
-    }
+	public void close() {
+		ConnectionManager.close_socket(peer_out);
+		ConnectionManager.close_socket(peer_in);
+	}
 
 }

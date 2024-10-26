@@ -1,6 +1,6 @@
 package peer;
 
-import java.io.Console;
+//import java.io.Console;
 import java.io.IOException;
 import java.security.KeyStore;
 import java.util.Scanner;
@@ -116,8 +116,7 @@ public class Main {
 			}
 			System.out.println("> Filepath:");
 			response = sc.nextLine();
-			System.out.println("> Password (can be empty, this is not recommended):");
-			password = sc.nextLine();
+			password = "";
 			
 			loadAditionalCerts(sc, password);
 			
@@ -128,22 +127,22 @@ public class Main {
     	return password;
 	}
 	
-	private static String[] configuration(Scanner sc) {
+	private static String configuration(Scanner sc) {
 		
-		String[] passwords = new String[2];
+		String password = "";
 		
     	System.out.println("#################>Configuration<#################");
-    	passwords[0] = keyStoreConfiguration(sc);
-    	passwords[1] = trustStoreConfiguration(sc);
+    	password = keyStoreConfiguration(sc);
+    	trustStoreConfiguration(sc);
     	System.out.println("#################################################");
     	//System.out.print("\033[H\033[2J"); // works with git bash(ANSI code for clearing the screen)
-    	return passwords;
+    	return password;
     }
 
 	public static void main(String[] args) throws IOException {
 		Scanner sc = new Scanner(System.in); // Create a Scanner object
 
-		String[] passwords = configuration(sc);
+		String password = configuration(sc);
 		
 		System.out.print("Enter name: ");
 		String userName = sc.nextLine(); // Read user input
@@ -155,9 +154,9 @@ public class Main {
 		String out = sc.nextLine(); // it need to be parsed like a string to avoid printing the initial menu twice
 		int out_port = Integer.parseInt(out);
 
-		Peer peer = new Peer(userName, in_port, out_port, keystore, truststore, passwords[0]);
-
-		peer.start(running, keystore, passwords[0]);
+		Peer peer = new Peer(userName, in_port, out_port, keystore, truststore);
+		peer.createTrustManager(password, keystore, truststore);
+		peer.start(running, keystore, password);
 		
 		while (running) {
 			peer.list_conversations();

@@ -35,31 +35,20 @@ public class ConnectionManager {
 		}
 	}
 
-	public static ServerSocket createServerSocket(int port, KeyStore store, String password) {
-		
-		System.out.println("Password:" + password);
-		
+	public static ServerSocket createServerSocket(int port, KeyStore store, KeyManager[] keyManagers, TrustManager[] trustManagers) {	
 		try {
-			KeyManagerFactory keyManager = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
-			keyManager.init(store, password.toCharArray());
-			KeyManager[] keyManagers = keyManager.getKeyManagers();
-
 			SSLContext sslContext = SSLContext.getInstance("TLS");
-			sslContext.init(keyManagers, null, null);
+			sslContext.init(keyManagers, trustManagers, null); //trustManagers may not be needed
 
 			SSLServerSocketFactory socketFactory = sslContext.getServerSocketFactory();
 			return socketFactory.createServerSocket(port);
 		} catch (NoSuchAlgorithmException 
-				| UnrecoverableKeyException 
-				| KeyStoreException 
 				| KeyManagementException
 				| IOException e) {
 			System.out.println("<-----Error creating peer input socket----->");
 			e.printStackTrace();
 			return null;
-
 		}
-
 	}
 
 	/**
@@ -78,19 +67,9 @@ public class ConnectionManager {
 		}
 	}
 	
-	private static SSLSocket peerClient(KeyStore keyStore, String password, KeyStore trustStore, String address, int port) {
+	private static SSLSocket peerClient(KeyStore keyStore, KeyStore trustStore, KeyManager[] keyManagers, TrustManager[] trustManagers, String address, int port) {
 		
 		try {
-			KeyManagerFactory keyManager = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
-			keyManager.init(keyStore, password.toCharArray());
-			KeyManager[] keyManagers = keyManager.getKeyManagers();
-
-			TrustManagerFactory trustManager = TrustManagerFactory
-					.getInstance(TrustManagerFactory.getDefaultAlgorithm());
-			trustManager.init(trustStore);
-			
-			TrustManager[] trustManagers = trustManager.getTrustManagers();
-
 			SSLContext sslContext = SSLContext.getInstance("TLS");
 			sslContext.init(keyManagers, trustManagers, null);
 
@@ -99,12 +78,6 @@ public class ConnectionManager {
 			
 			return clientSocket;
 		} catch (NoSuchAlgorithmException e) {
-			e.printStackTrace();
-			return null;
-		} catch (UnrecoverableKeyException e) {
-			e.printStackTrace();
-			return null;
-		} catch (KeyStoreException e) {
 			e.printStackTrace();
 			return null;
 		} catch (KeyManagementException e) {
@@ -145,9 +118,9 @@ public class ConnectionManager {
 	 * @return the socket that allows communication with the peer or null if there
 	 *         was an error
 	 */
-	public static SSLSocket try_connect_to_peer(KeyStore keyStore, String password, KeyStore trustStore, String peer_address, int peer_port) {
+	public static SSLSocket try_connect_to_peer(KeyStore keyStore, KeyStore trustStore, KeyManager[] keyManagers, TrustManager[] trustManager, String peer_address, int peer_port) {
 		//return peer_client(peer_address, peer_port);
-		return peerClient(keyStore, password, trustStore, peer_address, peer_port);
+		return peerClient(keyStore, trustStore, keyManagers, trustManager, peer_address, peer_port);
 	}
 
 	/**
@@ -156,7 +129,7 @@ public class ConnectionManager {
 	 * @param packet the packet to send
 	 * @return 0 if the sent packet was received -1 otherwise
 	 */
-	public static int sendPacket(Packet packet, ObjectInputStream in, ObjectOutputStream out) {
+	public static int sendPacket(String packet, ObjectInputStream in, ObjectOutputStream out) {
 		try {
 			out.writeObject(packet);
 			// Flush the stream to make sure the data is sent
@@ -172,8 +145,7 @@ public class ConnectionManager {
 			}
 
 			System.out.println("Received ACK packet");
-			MessageLogger.write_message_log(packet.get_sender() + ": " + packet.get_data(),
-					ack.get_sender() + ".conversation");
+			//MessageLogger.write_message_log(packet.get_sender() + ": " + packet.get_data(), ack.get_sender() + ".conversation");
 			return 0;
 		} catch (IOException e) {
 			System.out.println("Error sending packet: " + e.getMessage());

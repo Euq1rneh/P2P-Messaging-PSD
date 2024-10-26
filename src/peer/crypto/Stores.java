@@ -11,11 +11,15 @@ import java.io.OutputStream;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
+import java.security.KeyStore.ProtectionParameter;
+import java.security.KeyStore.SecretKeyEntry;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.util.Enumeration;
 import java.util.Scanner;
+
+import javax.crypto.SecretKey;
 
 public class Stores {
 
@@ -289,6 +293,19 @@ public class Stores {
 		try {
 			addAllCertificatesFromDirectory(truststore, dirPath);
 		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+	
+	public static void saveKeyToKeyStore(KeyStore ks, String ksPassword, SecretKey k, String alias, String keyStorePath) {
+		ProtectionParameter protectionParam = new KeyStore.PasswordProtection(ksPassword.toCharArray());
+		SecretKeyEntry secretKeyEntry = new KeyStore.SecretKeyEntry(k);
+		
+		try(FileOutputStream fos = new FileOutputStream(new File(keyStorePath))) {
+			ks.setEntry(alias, secretKeyEntry, protectionParam);
+			ks.store(fos, ksPassword.toCharArray());
+		} catch (KeyStoreException | NoSuchAlgorithmException | CertificateException | IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
