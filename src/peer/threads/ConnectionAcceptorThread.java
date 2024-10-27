@@ -5,38 +5,38 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
 
-
+import peer.Peer;
 import peer.messages.MessageReader;
 
-public class ConnectionAcceptorThread extends Thread{
+public class ConnectionAcceptorThread extends Thread {
 
-	private final String name;
+	private final Peer peer;
 	private boolean running;
-	private final ServerSocket server_socket;
-	
-	public ConnectionAcceptorThread(String name, boolean running, ServerSocket server_socket) {
-		this.name = name;
-		this.running = running;
-		this.server_socket = server_socket;
-	}
-	
-	@Override
-    public void run() {
-            while (!server_socket.isClosed()) {
-                try {
-                    Socket clientSocket = server_socket.accept();
-                    System.out.println("Accepted connection from peer" + clientSocket.getInetAddress().getHostAddress());
 
-                    new Thread(new MessageReader(name, clientSocket, running)).start();
-                } catch (SocketException e) {
-                    // this exception hopefully will only be thrown when quiting the program
-                    // so there is no need to handle the error
-                }catch (IOException e) {
-                    System.out.println("Error accepting connection");
-                    e.printStackTrace();
-                }
-            }
-            System.out.println("Server socket closed");
-    }
+	public ConnectionAcceptorThread(Peer peer, boolean running) {
+		this.peer = peer;
+		this.running = running;
+	}
+
+	@Override
+	public void run() {
+
+		ServerSocket server_socket = peer.getInputSocket();
+		while (!server_socket.isClosed()) {
+			try {
+				Socket clientSocket = server_socket.accept();
+				System.out.println("Accepted connection from peer" + clientSocket.getInetAddress().getHostAddress());
+
+				new Thread(new MessageReader(peer, clientSocket, running)).start();
+			} catch (SocketException e) {
+				// this exception hopefully will only be thrown when quiting the program
+				// so there is no need to handle the error
+			} catch (IOException e) {
+				System.out.println("Error accepting connection");
+				e.printStackTrace();
+			}
+		}
+		System.out.println("Server socket closed");
+	}
 
 }

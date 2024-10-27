@@ -13,12 +13,16 @@ import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.PublicKey;
 import java.security.UnrecoverableKeyException;
+import java.security.cert.Certificate;
 import java.util.Base64;
 import java.util.Scanner;
 
 import javax.crypto.SecretKey;
 import javax.net.ssl.KeyManager;
 import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLPeerUnverifiedException;
+import javax.net.ssl.SSLSession;
+import javax.net.ssl.SSLSocket;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 
@@ -35,7 +39,7 @@ public class Peer {
 	private final int in_port;
 	private final int out_port;
 	private ServerSocket peer_in;
-	private Socket peer_out;
+	private SSLSocket peer_out;
 	// streams used for sending messages
 	private ObjectOutputStream out;
 	private ObjectInputStream in;
@@ -74,8 +78,22 @@ public class Peer {
 			System.out.printf("Could not establish connection to peer (%s:%d)\n", address, port);
 			return -1;
 		}
-
+		
 		try {
+			//This block is for testing purposes
+			SSLSession session = peer_out.getSession();
+	        Certificate[] certs = session.getPeerCertificates();
+		
+	        System.out.printf("Got %d certificates", certs.length);
+	        System.out.flush();
+	        ////////////////////////////////////////////////////////////			
+		}catch(SSLPeerUnverifiedException e) {
+			e.printStackTrace();
+		}
+
+		
+		try {
+			
 			out = new ObjectOutputStream(peer_out.getOutputStream());
 			in = new ObjectInputStream(peer_out.getInputStream());
 		} catch (IOException e) {
@@ -173,6 +191,14 @@ public class Peer {
 		return 0;
 	}
 	
+	/**
+	 * Tries to read an encrypted message from a peer
+	 * @param message the encrypted message
+	 */
+	public void tryReadMessage(String message) {
+		
+	}
+	
 	
 	private SecretKey checkForEncryptionKey(Scanner sc, String alias, String password) {
 		try {
@@ -266,7 +292,7 @@ public class Peer {
 		}
 
 		// Create a thread to handle accepting connections
-		ConnectionAcceptorThread connectionAcceptorThread = new ConnectionAcceptorThread(name, running, peer_in);
+		ConnectionAcceptorThread connectionAcceptorThread = new ConnectionAcceptorThread(this, running);
 
 		// Start the thread that accepts connections
 		connectionAcceptorThread.start();
@@ -277,4 +303,12 @@ public class Peer {
 		ConnectionManager.close_socket(peer_in);
 	}
 
+	
+	public String getName() {
+		return name;
+	}
+	
+	public ServerSocket getInputSocket() {
+		return peer_in;
+	}
 }
