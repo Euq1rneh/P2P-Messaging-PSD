@@ -22,6 +22,7 @@ import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 
+import peer.crypto.HybridEncryption;
 import peer.messages.MessageLogger;
 
 public class ConnectionManager {
@@ -129,29 +130,32 @@ public class ConnectionManager {
 	 * @param packet the packet to send
 	 * @return 0 if the sent packet was received -1 otherwise
 	 */
-	public static int sendPacket(String packet, ObjectInputStream in, ObjectOutputStream out) {
+	public static EncryptedPacket sendPacket(EncryptedPacket packet, ObjectInputStream in, ObjectOutputStream out) {
 		try {
+			if(packet == null) {
+				System.out.println("Packet is null, nothing to send");
+				return null;
+			}
+			
 			out.writeObject(packet);
 			// Flush the stream to make sure the data is sent
 			// out.flush();
 			System.out.println("Sent packet");
 
 			// program can be blocked here if an ack packet is never received
-			Packet ack = (Packet) in.readObject();
-
-			if (ack == null) {
+			EncryptedPacket encAck = (EncryptedPacket) in.readObject();
+			
+			if (encAck == null) {
 				System.out.println("Did not receive ACK packet");
-				return -1;
+				return null;
 			}
-
-			System.out.println("Received ACK packet");
-			//MessageLogger.write_message_log(packet.get_sender() + ": " + packet.get_data(), ack.get_sender() + ".conversation");
-			return 0;
+			
+			return encAck;
 		} catch (IOException e) {
 			System.out.println("Error sending packet: " + e.getMessage());
-			return -1;
+			return null;
 		} catch (ClassNotFoundException e) {
-			throw new RuntimeException(e);
+			return null;
 		}
 	}
 }

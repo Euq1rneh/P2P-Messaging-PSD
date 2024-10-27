@@ -210,11 +210,11 @@ public class MessageEncryption {
 	}
 	
 	
-    public static String encrypt(String data, PublicKey publicKey) {
+    public static String encrypt(byte[] data, PublicKey publicKey) {
         try {
         	Cipher cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding");
 			cipher.init(Cipher.ENCRYPT_MODE, publicKey);
-	        byte[] encryptedData = cipher.doFinal(data.getBytes(StandardCharsets.UTF_8));
+	        byte[] encryptedData = cipher.doFinal(data);
 	        String encryptedBase64 = Base64.getEncoder().encodeToString(encryptedData);
 	        System.out.println("Encrypted (Base64): " + encryptedBase64);
 	        return encryptedBase64;
@@ -230,11 +230,11 @@ public class MessageEncryption {
     }
 
     // Decrypt data using the private key
-    public static String decrypt(String encryptedData, PrivateKey privateKey) throws Exception {
+    public static byte[] decrypt(String encryptedData, PrivateKey privateKey) throws NoSuchAlgorithmException, NoSuchPaddingException, IllegalBlockSizeException, BadPaddingException, InvalidKeyException {
         Cipher cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding");
         cipher.init(Cipher.DECRYPT_MODE, privateKey);
         byte[] decryptedData = cipher.doFinal(Base64.getDecoder().decode(encryptedData));
-        return new String(decryptedData, StandardCharsets.UTF_8);
+        return decryptedData;
     }
 
     // Sign the data using SHA256withRSA

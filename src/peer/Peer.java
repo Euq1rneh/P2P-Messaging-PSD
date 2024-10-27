@@ -7,16 +7,21 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.security.InvalidKeyException;
 import java.security.KeyPair;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
+import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.UnrecoverableKeyException;
 import java.security.cert.Certificate;
 import java.util.Base64;
 import java.util.Scanner;
 
+import javax.crypto.BadPaddingException;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
 import javax.net.ssl.KeyManager;
 import javax.net.ssl.KeyManagerFactory;
@@ -27,10 +32,12 @@ import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 
 import dataTypes.PacketType;
+import peer.crypto.HybridEncryption;
 import peer.crypto.MessageEncryption;
 import peer.crypto.Stores;
 import peer.messages.MessageLogger;
 import peer.network.ConnectionManager;
+import peer.network.EncryptedPacket;
 import peer.network.Packet;
 import peer.threads.ConnectionAcceptorThread;
 
@@ -49,7 +56,7 @@ public class Peer {
 	private KeyStore keyStore;
 	private KeyStore trustStore;
 	private String password;
-	
+
 	KeyManager[] keyManagers;
 	TrustManager[] trustManagers;
 
@@ -78,22 +85,11 @@ public class Peer {
 			System.out.printf("Could not establish connection to peer (%s:%d)\n", address, port);
 			return -1;
 		}
-		
-		try {
-			//This block is for testing purposes
-			SSLSession session = peer_out.getSession();
-	        Certificate[] certs = session.getPeerCertificates();
-		
-	        System.out.printf("Got %d certificates", certs.length);
-	        System.out.flush();
-	        ////////////////////////////////////////////////////////////			
-		}catch(SSLPeerUnverifiedException e) {
-			e.printStackTrace();
-		}
 
-		
+		System.out.println("AAAAAAAAAAAAAAAAAAAAAAAAA");
+
 		try {
-			
+
 			out = new ObjectOutputStream(peer_out.getOutputStream());
 			in = new ObjectInputStream(peer_out.getInputStream());
 		} catch (IOException e) {
@@ -106,7 +102,7 @@ public class Peer {
 
 	public void try_send_message(Scanner sc, String alias) {
 		boolean is_writing = true;
-		
+
 		while (is_writing) {
 			System.out.print("Message > ");
 			String msg = sc.nextLine();
@@ -119,35 +115,25 @@ public class Peer {
 				if (msg.isBlank() || msg.isEmpty()) {
 					break;
 				}
-				
-				PublicKey pk;
-				SecretKey k;
-				String encMsg;
-				String packet = name + "{@}" + msg + "{@}MSG";
-				
-				if((k = checkForEncryptionKey(sc, alias, password)) == null) {
-					return;
+
+				EncryptedPacket encPacket = encryptPacket(alias, msg, PacketType.MSG);
+
+				if (encPacket == null) {
+					System.out.println("Error encrypting packet");
+					is_writing = false;
+					continue;
 				}
-				
-				if((encMsg = MessageEncryption.encriptDataWithSymetricKey(k, packet.getBytes())) == null) {
-					return;
-				}
-				
-				if((pk = Stores.retrievePublicKey(trustStore, alias)) == null) {
-					return;
-				}
-				
-				if((encMsg = MessageEncryption.encrypt(encMsg, pk))== null) {
-					return;
-				}
-				
-				
+
 				// this could be changed later on if a server is used to store non delivered
 				// messages
-				if (send_message(encMsg, in, out) == -1) {
+				Packet ack;
+				
+				if ((ack = send_message(encPacket, in, out)) == null) {
 					is_writing = false;
 					System.out.println("Error sending message or message was blank/empty");
+					continue;
 				}
+				MessageLogger.write_message_log(name + ": " + msg, ack.get_sender() + ".conversation");
 				break;
 			}
 		}
@@ -155,8 +141,28 @@ public class Peer {
 		try {
 			out.close();
 			in.close();
-		}catch (IOException e) {
+		} catch (IOException e) {
 			System.out.println("Error closing output and input buffers");
+		}
+	}
+
+	public EncryptedPacket encryptPacket(String alias, String msg, PacketType type) {
+
+		try {
+			PublicKey pk = trustStore.getCertificate(alias).getPublicKey();
+
+			if (pk == null) {
+				System.out.println("Error retrieving assymetric keys");
+				System.exit(-1);
+			}
+			
+			Packet packet = new Packet(name, msg, type);
+			EncryptedPacket encPacket = HybridEncryption.encryptPacket(packet, pk);
+
+			return encPacket;
+		} catch (KeyStoreException e) {
+			e.printStackTrace();
+			return null;
 		}
 	}
 
@@ -169,52 +175,62 @@ public class Peer {
 	 * @param peer_port    the port of the peer that should receive the message
 	 * @return 0 if there was no error -1 otherwise
 	 */
-	private int send_message(String msg, ObjectInputStream in, ObjectOutputStream out) {
-		if (msg == null || msg.isEmpty() || msg.isBlank()) {
+	private Packet send_message(EncryptedPacket encPacket, ObjectInputStream in, ObjectOutputStream out) {
+		if (encPacket == null) {
 			System.out.println("No message was provided");
-			return -1;
+			return null;
 		}
 
 		if (peer_out == null) {
 			System.out.println("Could not send message beacause you're not connected to a peer");
-			return -1;
+			return null;
 		}
 
-		//TODO find a way to get the alias of the key and password for the keyStore
-		String alias = ""; // alias of the person the message is going to 
-		String password = ""; // password of the keyStore
+		EncryptedPacket encAck;
+		if ((encAck = ConnectionManager.sendPacket(encPacket, in, out)) == null) {
+			System.out.println("Did not receive ACK packet");
+			return null;
+		}
 		
-		
-		//Packet p = new Packet(name, msg, PacketType.MSG);
-		ConnectionManager.sendPacket(msg, in, out);
-
-		return 0;
+		Packet ack = tryReadMessage(encAck);
+		return ack;
 	}
-	
+
 	/**
 	 * Tries to read an encrypted message from a peer
+	 * 
 	 * @param message the encrypted message
 	 */
-	public void tryReadMessage(String message) {
-		
+	public Packet tryReadMessage(EncryptedPacket message) {
+
+		try {
+			PrivateKey prk = (PrivateKey) keyStore.getKey(name, password.toCharArray());
+			Packet p = HybridEncryption.decryptPacket(message, prk);
+			
+			return p;
+		} catch (UnrecoverableKeyException 
+				| KeyStoreException 
+				| NoSuchAlgorithmException e) {
+			e.printStackTrace();
+			return null;
+		}
 	}
-	
-	
+
 	private SecretKey checkForEncryptionKey(Scanner sc, String alias, String password) {
 		try {
-			
-			SecretKey k = (SecretKey) keyStore.getKey(alias, password.toCharArray()); 
-			
-			if(k == null) {
-				System.out.print("> Password (PBE): \n");
+
+			SecretKey k = (SecretKey) keyStore.getKey(alias, password.toCharArray());
+
+			if (k == null) {
+				System.out.print(">No key found creating new key...\n> Password (PBE): \n");
 				String password4Key = sc.nextLine();
-				
+
 				k = MessageEncryption.generatePBKDF2(password4Key);
 				password4Key = "";
 			}
-			
+
 			return k;
-		} catch (UnrecoverableKeyException | KeyStoreException |NoSuchAlgorithmException e) {
+		} catch (UnrecoverableKeyException | KeyStoreException | NoSuchAlgorithmException e) {
 			e.printStackTrace();
 		}
 		return null;
@@ -303,11 +319,10 @@ public class Peer {
 		ConnectionManager.close_socket(peer_in);
 	}
 
-	
 	public String getName() {
 		return name;
 	}
-	
+
 	public ServerSocket getInputSocket() {
 		return peer_in;
 	}
