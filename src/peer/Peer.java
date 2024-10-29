@@ -1,40 +1,25 @@
 package peer;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.ServerSocket;
-import java.net.Socket;
-import java.security.InvalidKeyException;
-import java.security.KeyPair;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.UnrecoverableKeyException;
-import java.security.cert.Certificate;
-import java.util.Base64;
 import java.util.Scanner;
 
-import javax.crypto.BadPaddingException;
-import javax.crypto.IllegalBlockSizeException;
-import javax.crypto.NoSuchPaddingException;
-import javax.crypto.SecretKey;
 import javax.net.ssl.KeyManager;
 import javax.net.ssl.KeyManagerFactory;
-import javax.net.ssl.SSLPeerUnverifiedException;
-import javax.net.ssl.SSLSession;
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 
 import dataTypes.PacketType;
 import peer.crypto.HybridEncryption;
-import peer.crypto.MessageEncryption;
-import peer.crypto.Stores;
 import peer.messages.MessageLogger;
 import peer.network.ConnectionManager;
 import peer.network.EncryptedPacket;
@@ -44,7 +29,6 @@ import peer.threads.ConnectionAcceptorThread;
 public class Peer {
 	private String name;
 	private final int in_port;
-	private final int out_port;
 	private ServerSocket peer_in;
 	private SSLSocket peer_out;
 	// streams used for sending messages
@@ -60,10 +44,9 @@ public class Peer {
 	KeyManager[] keyManagers;
 	TrustManager[] trustManagers;
 
-	public Peer(String name, int in_port, int out_port, KeyStore keyStore, KeyStore trustStore, String password) {
+	public Peer(String name, int in_port, KeyStore keyStore, KeyStore trustStore, String password) {
 		this.name = name;
 		this.in_port = in_port;
-		this.out_port = out_port;
 		this.keyStore = keyStore;
 		this.trustStore = trustStore;
 		this.password = password;
@@ -86,8 +69,6 @@ public class Peer {
 			return -1;
 		}
 
-		System.out.println("AAAAAAAAAAAAAAAAAAAAAAAAA");
-
 		try {
 
 			out = new ObjectOutputStream(peer_out.getOutputStream());
@@ -102,7 +83,8 @@ public class Peer {
 
 	public void try_send_message(Scanner sc, String alias) {
 		boolean is_writing = true;
-
+		System.out.printf("----------- Messaging %s -----------\n", alias);
+		
 		while (is_writing) {
 			System.out.print("Message > ");
 			String msg = sc.nextLine();
@@ -214,26 +196,6 @@ public class Peer {
 			e.printStackTrace();
 			return null;
 		}
-	}
-
-	private SecretKey checkForEncryptionKey(Scanner sc, String alias, String password) {
-		try {
-
-			SecretKey k = (SecretKey) keyStore.getKey(alias, password.toCharArray());
-
-			if (k == null) {
-				System.out.print(">No key found creating new key...\n> Password (PBE): \n");
-				String password4Key = sc.nextLine();
-
-				k = MessageEncryption.generatePBKDF2(password4Key);
-				password4Key = "";
-			}
-
-			return k;
-		} catch (UnrecoverableKeyException | KeyStoreException | NoSuchAlgorithmException e) {
-			e.printStackTrace();
-		}
-		return null;
 	}
 
 	/**

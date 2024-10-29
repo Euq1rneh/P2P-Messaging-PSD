@@ -144,17 +144,14 @@ public class Main {
 
 		String password = configuration(sc);
 		
-		System.out.print("Enter name: ");
+		System.out.print("Enter name: "); //should be derived from the key store name
 		String userName = sc.nextLine(); // Read user input
 
 		System.out.print("In Port: ");
 		String in = sc.nextLine();
 		int in_port = Integer.parseInt(in);
-		System.out.print("Out Port: ");
-		String out = sc.nextLine(); // it need to be parsed like a string to avoid printing the initial menu twice
-		int out_port = Integer.parseInt(out);
 
-		Peer peer = new Peer(userName, in_port, out_port, keystore, truststore, password);
+		Peer peer = new Peer(userName, in_port, keystore, truststore, password);
 		peer.createTrustManager(password, keystore, truststore);
 		peer.start(running, keystore, password);
 		
@@ -172,7 +169,14 @@ public class Main {
 				break;
 			} else if (command_args[0].equals(":t")) {
 				String address = command_args[1];
-				int port = Integer.parseInt(command_args[2]);
+				int port = 0;
+				try {
+					port = Integer.parseInt(command_args[2]);
+					
+				}catch(NumberFormatException e) {
+					System.out.println("Second argument of the talk command should be the port\n:t <ip> <port> <alias>");
+					continue;
+				}
 				String alias = command_args[3];
 				peer.connect(address, port);
 				peer.try_send_message(sc, alias);
@@ -187,14 +191,6 @@ public class Main {
 			} else if (command.equals("")) {
 				// functions as an update to the terminal
 			}
-//        	else {
-//        		System.out.printf("Command \"%s\" not recognized\n", command);
-//        	}
-//        	try {
-//				Thread.sleep(100);
-//			} catch (InterruptedException e) {
-//				e.printStackTrace();
-//			}
 		}
 	}
 }
