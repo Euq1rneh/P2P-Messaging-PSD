@@ -39,7 +39,7 @@ public class ConnectionManager {
 	public static ServerSocket createServerSocket(int port, KeyStore store, KeyManager[] keyManagers, TrustManager[] trustManagers) {	
 		try {
 			SSLContext sslContext = SSLContext.getInstance("TLS");
-			sslContext.init(keyManagers, trustManagers, null); //trustManagers may not be needed
+			sslContext.init(keyManagers, trustManagers, null);
 
 			SSLServerSocketFactory socketFactory = sslContext.getServerSocketFactory();
 			return socketFactory.createServerSocket(port);
@@ -48,22 +48,6 @@ public class ConnectionManager {
 				| IOException e) {
 			System.out.println("<-----Error creating peer input socket----->");
 			e.printStackTrace();
-			return null;
-		}
-	}
-
-	/**
-	 * Creates a socket connecting to another peer
-	 * 
-	 * @param address the ip address
-	 * @param port    the port
-	 * @return the socket connecting to the peer or null if there was an error
-	 */
-	private static Socket peer_client(String address, int port) {
-		try {
-			return new Socket(address, port);
-		} catch (IOException e) {
-			System.out.println("The peer you're trying to connect to is not online");
 			return null;
 		}
 	}
@@ -140,7 +124,7 @@ public class ConnectionManager {
 			out.writeObject(packet);
 			// Flush the stream to make sure the data is sent
 			// out.flush();
-			System.out.println("Sent packet");
+//			System.out.println("Sent packet");
 
 			// program can be blocked here if an ack packet is never received
 			EncryptedPacket encAck = (EncryptedPacket) in.readObject();

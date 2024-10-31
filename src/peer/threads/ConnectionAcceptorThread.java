@@ -25,7 +25,7 @@ public class ConnectionAcceptorThread extends Thread {
 		while (!server_socket.isClosed()) {
 			try {
 				Socket clientSocket = server_socket.accept();
-				System.out.println("Accepted connection from peer" + clientSocket.getInetAddress().getHostAddress());
+				//System.out.println("Accepted connection from peer" + clientSocket.getInetAddress().getHostAddress());
 
 				new Thread(new MessageReader(peer, clientSocket, running)).start();
 			} catch (SocketException e) {
@@ -36,7 +36,6 @@ public class ConnectionAcceptorThread extends Thread {
 				e.printStackTrace();
 			}
 		}
-		System.out.println("Server socket closed");
 	}
 
 }

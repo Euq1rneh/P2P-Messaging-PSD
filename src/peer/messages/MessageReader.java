@@ -8,8 +8,6 @@ import java.net.Socket;
 import dataTypes.PacketType;
 import peer.Peer;
 import peer.network.EncryptedPacket;
-import peer.crypto.HybridEncryption;
-import peer.crypto.MessageEncryption;
 import peer.network.Packet;
 
 public class MessageReader implements Runnable {
@@ -58,9 +56,8 @@ public class MessageReader implements Runnable {
 				// TODO change file name
                 MessageLogger.write_message_log(msg.get_sender() + ": " + msg.get_data(), msg.get_sender() + ".conversation");
 			}
-			System.out.println("Not running");
 		} catch (IOException e) {
-			System.out.println("Peer connection may have been closed unexpectedly");
+			System.out.println("Peer connection closed");
 		} catch (ClassNotFoundException e) {
 			System.out.println("Error: Packet class not found - " + e.getMessage());
 		}

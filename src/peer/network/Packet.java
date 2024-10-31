@@ -9,7 +9,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.Objects;
 
 
-public class Packet implements Serializable {
+public class Packet {
 
     private final String sender;
     private final String data;

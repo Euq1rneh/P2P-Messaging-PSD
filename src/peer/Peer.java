@@ -106,8 +106,6 @@ public class Peer {
 					continue;
 				}
 
-				// this could be changed later on if a server is used to store non delivered
-				// messages
 				Packet ack;
 				
 				if ((ack = send_message(encPacket, in, out)) == null) {
@@ -206,6 +204,11 @@ public class Peer {
 	 * @return 0 if could open the conversation -1 in case of error
 	 */
 	public int open_conversation(int conversation_id) {
+		if(conversations.length == 0 || conversation_id >= conversations.length || conversation_id < 0) {
+			System.out.println("The conversation you are trying to open does not exist");
+			return -1;
+		}
+		
 		String conversation = MessageLogger.read_message_log(conversations[conversation_id] + ".conversation");
 
 		if (conversation == null) {

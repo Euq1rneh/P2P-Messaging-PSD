@@ -1,6 +1,5 @@
 package peer.crypto;
 
-import java.awt.RenderingHints.Key;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
@@ -71,8 +70,7 @@ public class Stores {
 		}
 	}
 
-	public static KeyStore generateKeystore() {
-		Scanner scanner = new Scanner(System.in);
+	public static KeyStore generateKeystore(Scanner scanner) {
 		KeyStore k;
 
 		String keystorePassword;
