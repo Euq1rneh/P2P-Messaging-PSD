@@ -5,6 +5,8 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
 
+import javax.net.ssl.SSLSocket;
+
 import peer.Peer;
 import peer.messages.MessageReader;
 
@@ -24,7 +26,7 @@ public class ConnectionAcceptorThread extends Thread {
 		ServerSocket server_socket = peer.getInputSocket();
 		while (!server_socket.isClosed()) {
 			try {
-				Socket clientSocket = server_socket.accept();
+				SSLSocket clientSocket = (SSLSocket) server_socket.accept();
 				//System.out.println("Accepted connection from peer" + clientSocket.getInetAddress().getHostAddress());
 
 				new Thread(new MessageReader(peer, clientSocket, running)).start();

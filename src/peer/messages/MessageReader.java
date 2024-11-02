@@ -5,20 +5,22 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
 
+import javax.net.ssl.SSLSocket;
+
 import dataTypes.PacketType;
 import peer.Peer;
 import peer.network.EncryptedPacket;
 import peer.network.Packet;
 
 public class MessageReader implements Runnable {
-	private final Socket socket;
+	private final SSLSocket socket;
 	private final Peer peer;
 	String RESET = "\u001B[0m";
 	String YELLOW = "\u001B[33m";
 
 	boolean running_status;
 
-	public MessageReader(Peer peer, Socket socket, boolean running_status) {
+	public MessageReader(Peer peer, SSLSocket socket, boolean running_status) {
 		this.peer = peer;
 		this.socket = socket;
 		this.running_status = running_status;
