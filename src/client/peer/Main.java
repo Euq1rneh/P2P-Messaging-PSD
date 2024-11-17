@@ -1,10 +1,10 @@
-package peer;
+package client.peer;
 
 import java.io.IOException;
 import java.security.KeyStore;
 import java.util.Scanner;
 
-import peer.crypto.Stores;
+import common.Stores;
 
 public class Main {
 

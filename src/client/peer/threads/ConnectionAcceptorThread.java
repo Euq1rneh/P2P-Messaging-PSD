@@ -1,4 +1,4 @@
-package peer.threads;
+package client.peer.threads;
 
 import java.io.IOException;
 import java.net.ServerSocket;
@@ -7,8 +7,8 @@ import java.net.SocketException;
 
 import javax.net.ssl.SSLSocket;
 
-import peer.Peer;
-import peer.messages.MessageReader;
+import client.peer.Peer;
+import client.peer.messages.MessageReader;
 
 public class ConnectionAcceptorThread extends Thread {
 

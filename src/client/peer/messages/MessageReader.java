@@ -1,4 +1,4 @@
-package peer.messages;
+package client.peer.messages;
 
 import java.io.IOException;
 import java.io.ObjectInputStream;
@@ -7,10 +7,10 @@ import java.net.Socket;
 
 import javax.net.ssl.SSLSocket;
 
-import dataTypes.PacketType;
-import peer.Peer;
-import peer.network.EncryptedPacket;
-import peer.network.Packet;
+import client.dataTypes.PacketType;
+import client.peer.Peer;
+import client.peer.network.Packet;
+import common.EncryptedPacket;
 
 public class MessageReader implements Runnable {
 	private final SSLSocket socket;

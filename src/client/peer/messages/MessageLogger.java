@@ -1,4 +1,4 @@
-package peer.messages;
+package client.peer.messages;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;

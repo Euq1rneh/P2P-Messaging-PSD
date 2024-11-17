@@ -1,16 +1,26 @@
-package peer;
+package client.peer;
 
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.net.ResponseCache;
 import java.net.ServerSocket;
+import java.nio.file.FileSystems;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.UnrecoverableKeyException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Scanner;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import javax.net.ssl.KeyManager;
 import javax.net.ssl.KeyManagerFactory;
@@ -18,13 +28,13 @@ import javax.net.ssl.SSLSocket;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 
-import dataTypes.PacketType;
-import peer.crypto.HybridEncryption;
-import peer.messages.MessageLogger;
-import peer.network.ConnectionManager;
-import peer.network.EncryptedPacket;
-import peer.network.Packet;
-import peer.threads.ConnectionAcceptorThread;
+import client.dataTypes.PacketType;
+import client.peer.crypto.HybridEncryption;
+import client.peer.messages.MessageLogger;
+import client.peer.network.ConnectionManager;
+import client.peer.network.Packet;
+import client.peer.threads.ConnectionAcceptorThread;
+import common.EncryptedPacket;
 
 public class Peer {
 	private String name;
@@ -41,6 +51,7 @@ public class Peer {
 	private KeyStore trustStore;
 	private String password;
 
+	private HashMap<Integer, String> serverAliases;
 	KeyManager[] keyManagers;
 	TrustManager[] trustManagers;
 
@@ -50,6 +61,10 @@ public class Peer {
 		this.keyStore = keyStore;
 		this.trustStore = trustStore;
 		this.password = password;
+
+		serverAliases.put(1, "amazonServer");
+		serverAliases.put(2, "oracleServer");
+		serverAliases.put(3, "googleServer");
 	}
 
 	/**
@@ -81,10 +96,93 @@ public class Peer {
 		return 0;
 	}
 
+	private SSLSocket[] connectToBackupServer() {
+		SSLSocket[] servers = new SSLSocket[3];
+		//TODO implement logic
+		return servers;
+	}
+
+	private void trySendToServers(String msg, String alias) {
+		SSLSocket[] servers = connectToBackupServer();
+		Packet p = new Packet(name, alias + ".conversation", PacketType.RET_FILE);
+
+		List<ObjectOutputStream> outputStreams = new ArrayList<ObjectOutputStream>();
+
+		// check if any server has the file
+		// if one server has the file stop loop
+		// retrieve file
+		// decrypt
+		// add message
+		// encrypt
+		// send to all servers
+
+		String encData = null;
+
+		for (int i = 0; i < servers.length; i++) {
+			String serverAlias = serverAliases.get(i);
+			EncryptedPacket encRequest = encryptPacket(serverAlias, p);
+
+			try {
+				ObjectOutputStream out = new ObjectOutputStream(servers[i].getOutputStream());
+				ObjectInputStream in = new ObjectInputStream(servers[i].getInputStream());
+
+				outputStreams.add(out);
+				out.writeObject(encRequest);
+
+				EncryptedPacket encResponse = (EncryptedPacket) in.readObject();
+				Packet response = tryReadMessage(encResponse);
+
+				if ((encData = response.get_data()) != null) {
+					break;
+				}
+
+			} catch (IOException e) {
+				System.out.println("Error with streams");
+			} catch (ClassNotFoundException e) {
+				System.out.println("Could not cast to EncryptedPacket. Class not found");
+			}
+		}
+
+		File conversationFile;
+
+		if (encData == null) {
+			// criar file
+			conversationFile = new File(alias + ".conversation");
+		} else {
+			// decrypt file
+			conversationFile = null; // TODO: change to have decrypted file
+		}
+
+		try (BufferedWriter writer = new BufferedWriter(new FileWriter(conversationFile))) {
+			// add message
+			writer.write(msg);
+			writer.newLine();
+		} catch (IOException e) {
+			System.err.println("An error occurred while writing the message to the file: " + e.getMessage());
+		}
+
+		// enc file
+		String encFile = ""; // base64 encoded
+
+		for (int i = 0; i < servers.length; i++) {
+			// send file
+			ObjectOutputStream out = outputStreams.get(i);
+			EncryptedPacket encFilePacket = encryptPacket(serverAliases.get(i), alias + ".conversation " + encFile,
+					PacketType.MSG);
+
+			try {
+				out.writeObject(encFilePacket);
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
+	}
+
 	public void try_send_message(Scanner sc, String alias) {
 		boolean is_writing = true;
 		System.out.printf("----------- Messaging %s -----------\n", alias);
-		
+
 		while (is_writing) {
 			System.out.print("Message > ");
 			String msg = sc.nextLine();
@@ -107,13 +205,15 @@ public class Peer {
 				}
 
 				Packet ack;
-				
+
 				if ((ack = send_message(encPacket, in, out)) == null) {
 					is_writing = false;
 					System.out.println("Error sending message or message was blank/empty");
 					continue;
 				}
-				MessageLogger.write_message_log(name + ": " + msg, ack.get_sender() + ".conversation");
+				trySendToServers(name + ":" + msg, alias);
+				// MessageLogger.write_message_log(name + ": " + msg, ack.get_sender() +
+				// ".conversation");
 				break;
 			}
 		}
@@ -135,8 +235,27 @@ public class Peer {
 				System.out.println("Error retrieving assymetric keys");
 				System.exit(-1);
 			}
-			
+
 			Packet packet = new Packet(name, msg, type);
+			EncryptedPacket encPacket = HybridEncryption.encryptPacket(packet, pk);
+
+			return encPacket;
+		} catch (KeyStoreException e) {
+			e.printStackTrace();
+			return null;
+		}
+	}
+
+	public EncryptedPacket encryptPacket(String alias, Packet packet) {
+
+		try {
+			PublicKey pk = trustStore.getCertificate(alias).getPublicKey();
+
+			if (pk == null) {
+				System.out.println("Error retrieving assymetric keys");
+				System.exit(-1);
+			}
+
 			EncryptedPacket encPacket = HybridEncryption.encryptPacket(packet, pk);
 
 			return encPacket;
@@ -171,7 +290,7 @@ public class Peer {
 			System.out.println("Did not receive ACK packet");
 			return null;
 		}
-		
+
 		Packet ack = tryReadMessage(encAck);
 		return ack;
 	}
@@ -186,11 +305,9 @@ public class Peer {
 		try {
 			PrivateKey prk = (PrivateKey) keyStore.getKey(name, password.toCharArray());
 			Packet p = HybridEncryption.decryptPacket(message, prk);
-			
+
 			return p;
-		} catch (UnrecoverableKeyException 
-				| KeyStoreException 
-				| NoSuchAlgorithmException e) {
+		} catch (UnrecoverableKeyException | KeyStoreException | NoSuchAlgorithmException e) {
 			e.printStackTrace();
 			return null;
 		}
@@ -204,11 +321,11 @@ public class Peer {
 	 * @return 0 if could open the conversation -1 in case of error
 	 */
 	public int open_conversation(int conversation_id) {
-		if(conversations.length == 0 || conversation_id >= conversations.length || conversation_id < 0) {
+		if (conversations.length == 0 || conversation_id >= conversations.length || conversation_id < 0) {
 			System.out.println("The conversation you are trying to open does not exist");
 			return -1;
 		}
-		
+
 		String conversation = MessageLogger.read_message_log(conversations[conversation_id] + ".conversation");
 
 		if (conversation == null) {

@@ -1,40 +1,22 @@
-package peer.network;
+package server.network;
 
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.ServerSocket;
-import java.net.Socket;
-import java.net.UnknownHostException;
 import java.security.KeyManagementException;
 import java.security.KeyStore;
-import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
-import java.security.UnrecoverableKeyException;
 
 import javax.net.ssl.KeyManager;
-import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLServerSocketFactory;
-import javax.net.ssl.SSLSocket;
-import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.TrustManager;
-import javax.net.ssl.TrustManagerFactory;
 
-import peer.crypto.HybridEncryption;
-import peer.messages.MessageLogger;
+import common.EncryptedPacket;
 
 public class ConnectionManager {
-
-	public static ServerSocket peer_server(int port) {
-		try {
-			return new ServerSocket(port);
-		} catch (IOException e) {
-			System.out.println("<-----Error creating peer input socket----->");
-			return null;
-		}
-	}
 
 	public static ServerSocket createServerSocket(int port, KeyStore store, KeyManager[] keyManagers, TrustManager[] trustManagers) {	
 		try {
@@ -46,36 +28,10 @@ public class ConnectionManager {
 		} catch (NoSuchAlgorithmException 
 				| KeyManagementException
 				| IOException e) {
-			System.out.println("<-----Error creating peer input socket----->");
+			System.out.println("<-----Error creating server input socket----->");
 			e.printStackTrace();
 			return null;
 		}
-	}
-	
-	private static SSLSocket peerClient(KeyStore keyStore, KeyStore trustStore, KeyManager[] keyManagers, TrustManager[] trustManagers, String address, int port) {
-		
-		try {
-			SSLContext sslContext = SSLContext.getInstance("TLS");
-			sslContext.init(keyManagers, trustManagers, null);
-
-			SSLSocketFactory socketFactory = sslContext.getSocketFactory();
-			SSLSocket clientSocket = (SSLSocket) socketFactory.createSocket(address, port);
-			
-			return clientSocket;
-		} catch (NoSuchAlgorithmException e) {
-			e.printStackTrace();
-			return null;
-		} catch (KeyManagementException e) {
-			e.printStackTrace();
-			return null;
-		} catch (UnknownHostException e) {
-			e.printStackTrace();
-			return null;
-		} catch (IOException e) {
-			e.printStackTrace();
-			return null;
-		}
-		
 	}
 
 	/**
@@ -93,19 +49,6 @@ public class ConnectionManager {
 		} catch (IOException e) {
 			throw new RuntimeException(e);
 		}
-	}
-
-	/**
-	 * Tries to establish a connection to a peer
-	 * 
-	 * @param peer_address the ip address of the peer
-	 * @param peer_port    the port of the peer
-	 * @return the socket that allows communication with the peer or null if there
-	 *         was an error
-	 */
-	public static SSLSocket try_connect_to_peer(KeyStore keyStore, KeyStore trustStore, KeyManager[] keyManagers, TrustManager[] trustManager, String peer_address, int peer_port) {
-		//return peer_client(peer_address, peer_port);
-		return peerClient(keyStore, trustStore, keyManagers, trustManager, peer_address, peer_port);
 	}
 
 	/**

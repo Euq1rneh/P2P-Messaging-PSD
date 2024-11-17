@@ -1,4 +1,4 @@
-package peer.crypto;
+package client.peer.crypto;
 
 import java.security.PrivateKey;
 import java.security.PublicKey;
@@ -9,8 +9,8 @@ import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.GCMParameterSpec;
 
-import peer.network.EncryptedPacket;
-import peer.network.Packet;
+import client.peer.network.Packet;
+import common.EncryptedPacket;
 
 public class HybridEncryption {
 

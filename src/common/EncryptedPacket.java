@@ -1,4 +1,4 @@
-package peer.network;
+package common;
 
 import java.io.Serializable;
 

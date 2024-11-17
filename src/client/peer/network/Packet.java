@@ -1,5 +1,5 @@
-package peer.network;
-import dataTypes.PacketType;
+package client.peer.network;
+import client.dataTypes.PacketType;
 
 import java.io.Serializable;
 import java.nio.ByteBuffer;
