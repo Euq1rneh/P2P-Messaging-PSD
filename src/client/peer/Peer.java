@@ -103,16 +103,16 @@ public class Peer {
 		// i dont actually remember what we'd need to know from each server
 		// i assume it's IP and port since that's what works with what i implemented
 		// if this is wrong in some way, it makes sense, it's 6 am and im going to bed soon
-		String[] example = {"127.0.0.1:12345"};
-		SSLSocket[] servers = new SSLSocket[example.length];
+		String[] serverAdresses = {"127.0.0.1:1111","127.0.0.1:2222", "127.0.0.1:3333"};
+		SSLSocket[] servers = new SSLSocket[serverAdresses.length];
 
-		for (int i = 0; i < example.length; i++) {
+		for (int i = 0; i < serverAdresses.length; i++) {
 			try {
 				SSLSocketFactory factory = (SSLSocketFactory) SSLSocketFactory.getDefault();
-				servers[i] = (SSLSocket) factory.createSocket(example[i].split(":")[0], Integer.parseInt(example[i].split(":")[1]));
+				servers[i] = (SSLSocket) factory.createSocket(serverAdresses[i].split(":")[0], Integer.parseInt(serverAdresses[i].split(":")[1]));
 
 			} catch (IOException e) {
-				System.err.println("Error creating SSL sockets for " + example[i] + " Error message: " + e.getMessage());
+				System.err.println("Error creating SSL sockets for " + serverAdresses[i] + " Error message: " + e.getMessage());
 				servers[i] = null;
 			}
 		}
@@ -174,7 +174,8 @@ public class Peer {
 			conversationFile = new File(alias + ".conversation");
 		} else {
 			// decrypt file
-			conversationFile = null; // TODO: change to have decrypted file
+			
+			conversationFile = HybridEncryption.decryptFile(encData); // TODO: change to have decrypted file
 		}
 
 		try (BufferedWriter writer = new BufferedWriter(new FileWriter(conversationFile))) {
