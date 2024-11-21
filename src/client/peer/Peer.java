@@ -16,8 +16,10 @@ import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.UnrecoverableKeyException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Objects;
 import java.util.Scanner;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -25,6 +27,7 @@ import java.util.stream.Stream;
 import javax.net.ssl.KeyManager;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLSocket;
+import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 
@@ -96,10 +99,31 @@ public class Peer {
 		return 0;
 	}
 
-	private SSLSocket[] connectToBackupServer() {
-		SSLSocket[] servers = new SSLSocket[3];
-		//TODO implement logic
-		return servers;
+	private SSLSocket[] connectToBackupServer() {	
+		// i dont actually remember what we'd need to know from each server
+		// i assume it's IP and port since that's what works with what i implemented
+		// if this is wrong in some way, it makes sense, it's 6 am and im going to bed soon
+		String[] example = {"127.0.0.1:12345"};
+		SSLSocket[] servers = new SSLSocket[example.length];
+
+		for (int i = 0; i < example.length; i++) {
+			try {
+				SSLSocketFactory factory = (SSLSocketFactory) SSLSocketFactory.getDefault();
+				servers[i] = (SSLSocket) factory.createSocket(example[i].split(":")[0], Integer.parseInt(example[i].split(":")[1]));
+
+			} catch (IOException e) {
+				System.err.println("Error creating SSL sockets for " + example[i] + " Error message: " + e.getMessage());
+				servers[i] = null;
+			}
+		}
+		
+		// this looks a bit ugly and excessive but it's how im deleting nulls
+		// out of the array in case there's a bad socket
+		// btw this code is based on code i found on a website
+		// if you have a cleaner solution, by all means
+		SSLSocket[] serversFinal = Arrays.stream(servers).filter(Objects::nonNull).toArray(SSLSocket[]::new);
+			
+		return serversFinal;
 	}
 
 	private void trySendToServers(String msg, String alias) {
