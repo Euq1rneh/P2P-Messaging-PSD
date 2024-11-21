@@ -94,35 +94,47 @@ public class HybridEncryption {
 		}
 	}
 
-	public static String encryptFile(File f, PublicKey pk) {
-		SecretKey aesKey;
-		try {
-			// gerar AES key
-			KeyGenerator keyGen = KeyGenerator.getInstance("AES");
-			keyGen.init(256);
-			aesKey = keyGen.generateKey();
-			
-			// encrypt file com AES
-			byte[] fileBytes = readFileToByteArray(f);
-			
-			
-			
-		} catch (NoSuchAlgorithmException e) {
-			System.out.println("Could not generate encryption key");
-			e.printStackTrace();
-			return null;
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
+    public static String encryptFile(File f, PublicKey pk) {
+        SecretKey aesKey;
+        byte[] encryptedFileBytes;
+        byte[] aesKeyBytes;
 
-		
+        try {
+            // Step 1: Generate AES key
+            KeyGenerator keyGen = KeyGenerator.getInstance("AES");
+            keyGen.init(256); // 256-bit AES key
+            aesKey = keyGen.generateKey();
 
-		// encrypt AES com PK (wrap???)
-		// converter para Base64 (chave e ficheiro)
-		// concatenar os 2
-		return null;
-	}
+            // Step 2: Read the file content
+            byte[] fileBytes = readFileToByteArray(f);
+
+            Cipher aesCipher = Cipher.getInstance("AES/GCM/NoPadding");
+			byte[] iv = deriveIV(aesKey);
+			GCMParameterSpec gcmSpec = new GCMParameterSpec(128, iv); // 128-bit authentication tag
+
+			aesCipher.init(Cipher.ENCRYPT_MODE, aesKey, gcmSpec);
+			encryptedFileBytes = aesCipher.doFinal(fileBytes);
+
+            // Step 4: Wrap the AES key with the public key (RSA encryption)
+            aesKeyBytes = wrapAESKey(aesKey, pk);
+
+        } catch (NoSuchAlgorithmException | IOException e) {
+            System.out.println("Encryption failed");
+            e.printStackTrace();
+            return null;
+        } catch (Exception e) {
+            System.out.println("Encryption error");
+            e.printStackTrace();
+            return null;
+        }
+
+        // Step 5: Base64 encode the AES key and the encrypted file content
+        String base64EncryptedAESKey = Base64.getEncoder().encodeToString(aesKeyBytes);
+        String base64EncryptedFile = Base64.getEncoder().encodeToString(encryptedFileBytes);
+
+        // Step 6: Concatenate the Base64-encoded AES key and encrypted file content with '@'
+        return base64EncryptedAESKey + "@" + base64EncryptedFile;
+    }
 
 	private static byte[] deriveIV(SecretKey aesKey) throws Exception {
 		MessageDigest digest = MessageDigest.getInstance("SHA-256");
