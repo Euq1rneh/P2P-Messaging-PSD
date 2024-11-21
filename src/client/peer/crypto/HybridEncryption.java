@@ -6,11 +6,15 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.security.InvalidKeyException;
+import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.SecureRandom;
+import java.util.Arrays;
 import java.util.Base64;
 
 import javax.crypto.BadPaddingException;
@@ -76,16 +80,104 @@ public class HybridEncryption {
 		return null;
 	}
 
-	public static String encryptFile(File f, SecretKey aesKey) {
-		//gerar AES key
-		//encrypt file com AES
-		//encrypt AES com PK (wrap???)
-		//converter para Base64 (chave e ficheiro)
-		//concatenar os 2
+	public static byte[] readFileToByteArray(File file) throws IOException {
+		try (FileInputStream fis = new FileInputStream(file); // FileInputStream to read the file
+				ByteArrayOutputStream baos = new ByteArrayOutputStream()) { // ByteArrayOutputStream to accumulate bytes
+
+			byte[] buffer = new byte[1024]; // Buffer for reading chunks of the file
+			int bytesRead;
+			while ((bytesRead = fis.read(buffer)) != -1) {
+				baos.write(buffer, 0, bytesRead); // Write the bytes to ByteArrayOutputStream
+			}
+
+			return baos.toByteArray(); // Convert the ByteArrayOutputStream to byte[]
+		}
 	}
 
-	public static File decryptFile(String encryptedFile) {
-		//processo inverso de encrypt file
+	public static String encryptFile(File f, PublicKey pk) {
+		SecretKey aesKey;
+		try {
+			// gerar AES key
+			KeyGenerator keyGen = KeyGenerator.getInstance("AES");
+			keyGen.init(256);
+			aesKey = keyGen.generateKey();
+			
+			// encrypt file com AES
+			byte[] fileBytes = readFileToByteArray(f);
+			
+			
+			
+		} catch (NoSuchAlgorithmException e) {
+			System.out.println("Could not generate encryption key");
+			e.printStackTrace();
+			return null;
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+
+		
+
+		// encrypt AES com PK (wrap???)
+		// converter para Base64 (chave e ficheiro)
+		// concatenar os 2
 		return null;
+	}
+
+	private static byte[] deriveIV(SecretKey aesKey) throws Exception {
+		MessageDigest digest = MessageDigest.getInstance("SHA-256");
+		byte[] hash = digest.digest(aesKey.getEncoded());
+		return Arrays.copyOf(hash, 12); // Use the first 12 bytes for GCM
+	}
+
+	public static File decryptFile(String encryptedFile, PrivateKey prKey) {
+		String[] fileParts = encryptedFile.split("@");
+
+		if (fileParts.length != 2) {
+			System.out.println("Error decrypting file. File may have been corrupted");
+			return null;
+		}
+
+		byte[] aesKeyByte = Base64.getDecoder().decode(fileParts[0]);
+		byte[] fileByte = Base64.getDecoder().decode(fileParts[1]);
+
+		byte[] decryptedFileBytes;
+		SecretKey aesKey;
+
+		try {
+			aesKey = unwrapAESKey(aesKeyByte, prKey);
+			Cipher aesCipher = Cipher.getInstance("AES/GCM/NoPadding");
+			GCMParameterSpec gcmSpec = new GCMParameterSpec(128, deriveIV(aesKey)); // iv is derived from the key's hash
+			aesCipher.init(Cipher.DECRYPT_MODE, aesKey, gcmSpec);
+
+			decryptedFileBytes = aesCipher.doFinal(fileByte);
+
+		} catch (Exception e) {
+			e.printStackTrace();
+			return null;
+		}
+
+		File returnFile = new File("returnedFile.conversation");
+
+		try (FileOutputStream fos = new FileOutputStream(returnFile)) {
+			fos.write(decryptedFileBytes);
+		} catch (IOException e) {
+			return null;
+		}
+
+		return returnFile;
+	}
+
+	public static byte[] wrapAESKey(SecretKey aesKey, PublicKey publicKey) throws Exception {
+		Cipher cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding");
+		cipher.init(Cipher.WRAP_MODE, publicKey);
+		return cipher.wrap(aesKey);
+	}
+
+	// Method to unwrap an AES key with a private key
+	public static SecretKey unwrapAESKey(byte[] wrappedKey, PrivateKey privateKey) throws Exception {
+		Cipher cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding");
+		cipher.init(Cipher.UNWRAP_MODE, privateKey);
+		return (SecretKey) cipher.unwrap(wrappedKey, "AES", Cipher.SECRET_KEY);
 	}
 }

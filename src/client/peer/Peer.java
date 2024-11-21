@@ -174,8 +174,12 @@ public class Peer {
 			conversationFile = new File(alias + ".conversation");
 		} else {
 			// decrypt file
-			
-			conversationFile = HybridEncryption.decryptFile(encData); // TODO: change to have decrypted file
+			try {
+				conversationFile = HybridEncryption.decryptFile(encData,(PrivateKey) keyStore.getKey(name, password.toCharArray()));
+			} catch (UnrecoverableKeyException | KeyStoreException | NoSuchAlgorithmException e) {	
+				e.printStackTrace();
+				return;
+			}
 		}
 
 		try (BufferedWriter writer = new BufferedWriter(new FileWriter(conversationFile))) {
@@ -187,8 +191,19 @@ public class Peer {
 		}
 
 		// enc file
-		String encFile = ""; // base64 encoded
-
+		String encFile = null;
+		try {
+			encFile = HybridEncryption.encryptFile(conversationFile, trustStore.getCertificate(name).getPublicKey());
+		} catch (KeyStoreException e) {
+			System.out.println("Could not retrieve public key");
+			e.printStackTrace();
+		} 
+		
+		if(encFile == null) {
+			System.out.println("Error trying to encrypt file for backup servers");
+			return;
+		}
+		
 		for (int i = 0; i < servers.length; i++) {
 			// send file
 			ObjectOutputStream out = outputStreams.get(i);
