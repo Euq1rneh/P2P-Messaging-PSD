@@ -2,10 +2,12 @@
 
 # Variables
 SRC_DIR="src"
+COMMON_DIR="common"
 BIN_DIR="bin"
 DIST_DIR="dist"
-CLIENT_JAR="dist/messagingAppPeer.jar"
-SERVER_JAR="dist/messagingAppServer.jar"
+CLIENT_JAR="$DIST_DIR/messagingAppPeer.jar"
+SERVER_JAR="$DIST_DIR/messagingAppServer.jar"
+MANIFEST_FILE="MANIFEST.MF"
 
 # Ensure bin and dist directories exist
 if [ ! -d "$BIN_DIR" ]; then
@@ -27,12 +29,23 @@ else
   exit 1
 fi
 
+# Create a Manifest File for the Client JAR with Class-Path entry
+echo "Main-Class: client.peer.Main" > "$MANIFEST_FILE"
+echo "Class-Path: common/" >> "$MANIFEST_FILE"
+
 # Create the Client JAR (includes common package)
 echo "Building Client JAR..."
-jar --create --file "$CLIENT_JAR" --manifest <(echo "Main-Class: client.peer.Main") -C "$BIN_DIR" client common
+jar cmf "$MANIFEST_FILE" "$CLIENT_JAR" -C "$BIN_DIR" client -C "$BIN_DIR" common
+
+# Create a Manifest File for the Server JAR with Class-Path entry
+echo "Main-Class: server.server.Main" > "$MANIFEST_FILE"
+echo "Class-Path: common/" >> "$MANIFEST_FILE"
 
 # Create the Server JAR (includes common package)
 echo "Building Server JAR..."
-jar --create --file "$SERVER_JAR" --manifest <(echo "Main-Class: server.server.Main") -C "$BIN_DIR" server common
+jar cmf "$MANIFEST_FILE" "$SERVER_JAR" -C "$BIN_DIR" server -C "$BIN_DIR" common
+
+# Remove the MANIFEST file after creating the JARs
+rm -f "$MANIFEST_FILE"
 
 echo "Build completed successfully. JAR files are in the $DIST_DIR directory."

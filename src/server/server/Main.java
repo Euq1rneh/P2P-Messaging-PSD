@@ -71,7 +71,7 @@ public class Main {
 		//clear password????
 		
 		serverSocket = ConnectionManager.createServerSocket(in_port, keyStore, keyManagers, trustManagers);
-		
+		System.out.println("Started backup server");
 		while (!serverSocket.isClosed()) {
 			try {
 				SSLSocket clientSocket = (SSLSocket) serverSocket.accept();
