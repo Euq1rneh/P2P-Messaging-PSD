@@ -99,37 +99,29 @@ public class Peer {
 		return 0;
 	}
 
-	private SSLSocket[] connectToBackupServer() {	
-		// i dont actually remember what we'd need to know from each server
-		// i assume it's IP and port since that's what works with what i implemented
-		// if this is wrong in some way, it makes sense, it's 6 am and im going to bed soon
-		String[] serverAdresses = {"127.0.0.1:1111","127.0.0.1:2222", "127.0.0.1:3333"};
+	private SSLSocket[] connectToBackupServer() {
+		String[] serverAdresses = { "127.0.0.1:1111", "127.0.0.1:2222", "127.0.0.1:3333" };
 		SSLSocket[] servers = new SSLSocket[serverAdresses.length];
 
 		for (int i = 0; i < serverAdresses.length; i++) {
-			try {
-				SSLSocketFactory factory = (SSLSocketFactory) SSLSocketFactory.getDefault();
-				servers[i] = (SSLSocket) factory.createSocket(serverAdresses[i].split(":")[0], Integer.parseInt(serverAdresses[i].split(":")[1]));
+			String[] connectionArgs = serverAdresses[i].split(":");
 
-			} catch (IOException e) {
-				System.err.println("Could not establish connection to " + serverAdresses[i]);
-				servers[i] = null;
+			servers[i] = ConnectionManager.try_connect_to_peer(keyStore, trustStore, keyManagers, trustManagers,
+					connectionArgs[0], Integer.parseInt(connectionArgs[1]));
+			
+			if(servers[i] == null) {
+				System.out.println("Could not connect to server with address "+ serverAdresses[i]);
 			}
 		}
-		
-		// this looks a bit ugly and excessive but it's how im deleting nulls
-		// out of the array in case there's a bad socket
-		// btw this code is based on code i found on a website
-		// if you have a cleaner solution, by all means
-		//SSLSocket[] serversFinal = Arrays.stream(servers).filter(Objects::nonNull).toArray(SSLSocket[]::new);
-			
+
 		return servers;
 	}
 
 	/**
-	 * Tries to send a backup conversation file to a set of servers.
-	 * This method might be a point of concurrency
-	 * @param msg the message to update the files with
+	 * Tries to send a backup conversation file to a set of servers. This method
+	 * might be a point of concurrency
+	 * 
+	 * @param msg   the message to update the files with
 	 * @param alias the name of the conversation file
 	 */
 	public synchronized void trySendToServers(String msg, String alias) {
@@ -149,18 +141,17 @@ public class Peer {
 		String encData = null;
 		for (int i = 0; i < servers.length; i++) {
 			SSLSocket currentServer = servers[i];
-			if(currentServer == null) {
-				continue; //server connection was not established (might be down for maintenance)
+			if (currentServer == null) {
+				continue; // server connection was not established (might be down for maintenance)
 			}
-			
+
 			String serverAlias = serverAliases.get(i);
 
-			
-			System.out.println("Searching for existing file in server ("+i+") "+ serverAlias);
-			
-			EncryptedPacket encRequest = encryptPacket(serverAlias, p);			
-			//TODO: if all servers are down switch to a local backup
-			
+			System.out.println("Searching for existing file in server (" + i + ") " + serverAlias);
+
+			EncryptedPacket encRequest = encryptPacket(serverAlias, p);
+			// TODO: if all servers are down switch to a local backup
+
 			try {
 				ObjectOutputStream out = new ObjectOutputStream(currentServer.getOutputStream());
 				ObjectInputStream in = new ObjectInputStream(currentServer.getInputStream());
@@ -174,12 +165,12 @@ public class Peer {
 				EncryptedPacket encResponse = (EncryptedPacket) in.readObject();
 				Packet response = tryReadMessage(encResponse);
 				System.out.println("Server response detected. Reading response...");
-				
+
 				if ((encData = response.get_data()) != null) {
 					System.out.println("Server has backup file. Skipping other servers...");
 					break;
 				}
-				
+
 				System.out.println("Server did not have backup file. Asking other servers...");
 
 			} catch (IOException e) {
@@ -200,13 +191,14 @@ public class Peer {
 			// decrypt file
 			System.out.println("Decrypting .conversation file");
 			try {
-				conversationFile = HybridEncryption.decryptFile(encData,(PrivateKey) keyStore.getKey(name, password.toCharArray()));
-			} catch (UnrecoverableKeyException | KeyStoreException | NoSuchAlgorithmException e) {	
+				conversationFile = HybridEncryption.decryptFile(encData,
+						(PrivateKey) keyStore.getKey(name, password.toCharArray()));
+			} catch (UnrecoverableKeyException | KeyStoreException | NoSuchAlgorithmException e) {
 				e.printStackTrace();
 				return;
 			}
 		}
-		
+
 		System.out.println("Writing new message...");
 		try (BufferedWriter writer = new BufferedWriter(new FileWriter(conversationFile))) {
 			// add message
@@ -224,22 +216,22 @@ public class Peer {
 		} catch (KeyStoreException e) {
 			System.out.println("Could not retrieve public key");
 			e.printStackTrace();
-		} 
-		
-		if(encFile == null) {
+		}
+
+		if (encFile == null) {
 			System.out.println("Error trying to encrypt file for backup servers");
 			return;
 		}
-		
+
 		System.out.println("Sending file to backup servers...");
 		for (int i = 0; i < servers.length; i++) {
-			if(servers[i] == null) {
+			if (servers[i] == null) {
 				continue;
 			}
-			
+
 			String serverAlias = serverAliases.get(i);
 			// send file
-			System.out.println("Sending file to server ("+i+") "+ serverAlias);
+			System.out.println("Sending file to server (" + i + ") " + serverAlias);
 			ObjectOutputStream out = outputStreams.get(i);
 			EncryptedPacket encFilePacket = encryptPacket(serverAlias, alias + ".conversation " + encFile,
 					PacketType.MSG);

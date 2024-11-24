@@ -57,16 +57,12 @@ public class ConnectionManager {
 			
 			return clientSocket;
 		} catch (NoSuchAlgorithmException e) {
-			e.printStackTrace();
 			return null;
 		} catch (KeyManagementException e) {
-			e.printStackTrace();
 			return null;
 		} catch (UnknownHostException e) {
-			e.printStackTrace();
 			return null;
 		} catch (IOException e) {
-			e.printStackTrace();
 			return null;
 		}
 		
