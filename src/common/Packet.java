@@ -1,6 +1,4 @@
-package client.peer.network;
-import client.dataTypes.PacketType;
-
+package common;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;

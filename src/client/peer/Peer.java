@@ -31,13 +31,13 @@ import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 
-import client.dataTypes.PacketType;
 import client.peer.crypto.HybridEncryption;
 import client.peer.messages.MessageLogger;
 import client.peer.network.ConnectionManager;
-import client.peer.network.Packet;
 import client.peer.threads.ConnectionAcceptorThread;
 import common.EncryptedPacket;
+import common.Packet;
+import common.PacketType;
 
 public class Peer {
 	private String name;

@@ -1,8 +1,9 @@
-package client.dataTypes;
+package common;
 
 public enum PacketType {
     MSG,    //normal message
     ACK,    //MSG acknowledgment
     RET_FILE, //retrieve file
+    BACKUP, //backup file
     CLS,    //close
 }

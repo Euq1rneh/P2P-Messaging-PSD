@@ -7,10 +7,10 @@ import java.net.Socket;
 
 import javax.net.ssl.SSLSocket;
 
-import client.dataTypes.PacketType;
 import client.peer.Peer;
-import client.peer.network.Packet;
 import common.EncryptedPacket;
+import common.Packet;
+import common.PacketType;
 
 public class MessageReader implements Runnable {
 	private final SSLSocket socket;

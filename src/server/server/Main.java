@@ -17,6 +17,7 @@ import javax.net.ssl.TrustManagerFactory;
 
 import client.peer.Peer;
 import common.Stores;
+import server.cypto.Encryption;
 import server.messages.MessageReader;
 import server.network.ConnectionManager;
 
@@ -56,19 +57,20 @@ public class Main {
 
 		//port, keystore, password keystore,trust
 		
-		if(args.length != 4) {
+		if(args.length != 5) {
 			System.out.println("Missing arguments");
+			System.out.println("<alias> <port> <keystore-path> <keystore-password> <truststore-path>");
 			//print help menu
 			return;
 		}
 		
-		int in_port = Integer.parseInt(args[0]);
-		keyStore = Stores.tryLoadKeystore(args[1], args[2]);
-		trustStore = Stores.tryLoadTrustStore(args[3], "");
+		int in_port = Integer.parseInt(args[1]);
+		keyStore = Stores.tryLoadKeystore(args[2], args[3]);
+		trustStore = Stores.tryLoadTrustStore(args[4], "");
 		
 		createTrustManager(args[2], keyStore, trustStore);
 		
-		//clear password????
+		Encryption.setConfig(args[0], args[2], keyStore, trustStore);
 		
 		serverSocket = ConnectionManager.createServerSocket(in_port, keyStore, keyManagers, trustManagers);
 		System.out.println("Started backup server");

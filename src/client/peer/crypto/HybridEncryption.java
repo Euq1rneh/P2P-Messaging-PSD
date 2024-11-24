@@ -25,8 +25,8 @@ import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.GCMParameterSpec;
 
-import client.peer.network.Packet;
 import common.EncryptedPacket;
+import common.Packet;
 
 public class HybridEncryption {
 
