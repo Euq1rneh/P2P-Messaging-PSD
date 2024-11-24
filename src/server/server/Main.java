@@ -54,7 +54,7 @@ public class Main {
 	
 	public static void main(String[] args) {
 
-		//port, keystore/trust, password keystore
+		//port, keystore, password keystore,trust
 		
 		if(args.length != 4) {
 			System.out.println("Missing arguments");

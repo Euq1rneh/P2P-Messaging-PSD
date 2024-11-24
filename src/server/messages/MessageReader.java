@@ -33,7 +33,6 @@ public class MessageReader implements Runnable {
 				EncryptedPacket packet = (EncryptedPacket) in.readObject();
 				System.out.println("Received packet from client");
 				System.out.println("Saving...");
-				
 			}
 		} catch (IOException e) {
 			System.out.println("Client connection closed");
