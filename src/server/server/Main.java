@@ -19,6 +19,7 @@ import client.peer.Peer;
 import common.Stores;
 import server.cypto.Encryption;
 import server.messages.MessageReader;
+import server.messages.ServerFiles;
 import server.network.ConnectionManager;
 
 public class Main {
@@ -55,7 +56,7 @@ public class Main {
 	
 	public static void main(String[] args) {
 
-		//port, keystore, password keystore,trust
+		//alias, port, keystore, password keystore,trust
 		
 		if(args.length != 5) {
 			System.out.println("Missing arguments");
@@ -68,8 +69,9 @@ public class Main {
 		keyStore = Stores.tryLoadKeystore(args[2], args[3]);
 		trustStore = Stores.tryLoadTrustStore(args[4], "");
 		
-		createTrustManager(args[2], keyStore, trustStore);
+		createTrustManager(args[3], keyStore, trustStore);
 		
+		ServerFiles.createDirs();
 		Encryption.setConfig(args[0], args[2], keyStore, trustStore);
 		
 		serverSocket = ConnectionManager.createServerSocket(in_port, keyStore, keyManagers, trustManagers);

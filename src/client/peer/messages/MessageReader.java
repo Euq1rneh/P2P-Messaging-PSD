@@ -33,14 +33,12 @@ public class MessageReader implements Runnable {
 			ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
 
 			while (running_status) {
-//				System.out.println(YELLOW + "<------ Reading thread ------>" + RESET);
 
 				EncryptedPacket packet = (EncryptedPacket) in.readObject();
 
 				Packet msg = this.peer.tryReadMessage(packet);
 				if (msg == null) {
-					System.out.println(YELLOW + "Error receiving message" + RESET);
-					System.out.println(YELLOW + "<------ End of reading thread ------>" + RESET);
+					System.out.println("Error receiving message");
 					continue;
 				}
 

@@ -108,13 +108,103 @@ public class Peer {
 
 			servers[i] = ConnectionManager.try_connect_to_peer(keyStore, trustStore, keyManagers, trustManagers,
 					connectionArgs[0], Integer.parseInt(connectionArgs[1]));
-			
-			if(servers[i] == null) {
-				System.out.println("Could not connect to server with address "+ serverAdresses[i]);
+
+			if (servers[i] == null) {
+				System.out.println("Could not connect to server with address " + serverAdresses[i]);
 			}
 		}
 
 		return servers;
+	}
+
+	/**
+	 * Tries to retrieve a file from the backup servers
+	 * 
+	 * @param serverAlias  the server alias for key retrieval
+	 * @param filename     the name of the file to retrieve
+	 * @param outputStream the output stream of the socket connection to the server
+	 * @param inputStream  the input stream of the socket connection to the server
+	 * @return the file contents if it found the file null otherwise
+	 */
+	private String retrieveFile(String serverAlias, String filename, ObjectOutputStream outputStream,
+			ObjectInputStream inputStream) {
+		Packet p = new Packet(name, filename, PacketType.RET_FILE);
+
+		String encData = null;
+		System.out.println("Searching for existing file in server " + serverAlias);
+
+		EncryptedPacket encRequest = encryptPacket(serverAlias, p);
+		
+		try {
+
+			System.out.println("Sending file request");
+			out.writeObject(encRequest);
+
+			System.out.println("Waiting for server response...");
+			EncryptedPacket encResponse = (EncryptedPacket) in.readObject();
+
+			if (encResponse.getEncryptedData() == null || encResponse.getEncryptedAESKey() == null
+					|| encResponse.getIv() == null) {
+
+				// server could not decode message
+				return null;
+			}
+
+			Packet response = tryReadMessage(encResponse);
+			
+			System.out.println("Server response detected. Reading response...");
+			
+			if(response == null) {
+				System.out.println("Error while trying to read response from server");
+				return null;
+			}
+
+			if ((encData = response.get_data()) != null) {
+				System.out.println("Server has backup file. Skipping other servers...");
+				return encData;
+			}
+
+			System.out.println("Server did not have backup file. Asking other servers...");
+
+		} catch (IOException e) {
+			System.out.println("Error with streams");
+			e.printStackTrace();
+		} catch (ClassNotFoundException e) {
+			System.out.println("Could not cast to EncryptedPacket. Class not found");
+		}
+
+		return encData;
+	}
+
+	private boolean sendFileToServer(String serverAlias, EncryptedPacket packet, ObjectOutputStream outputStream,
+			ObjectInputStream inputStream) {
+
+		try {
+			out.writeObject(packet);
+
+			// TODO receive ACK
+			EncryptedPacket encResponse = (EncryptedPacket) in.readObject();
+
+			Packet response = tryReadMessage(encResponse);
+
+			if (response == null) {
+				System.out.println("Error receiving ACK from server. (file backup)");
+				return false;
+			}
+
+			if (!response.get_packet_type().equals(PacketType.ACK)) {
+				return false;
+			}
+
+			return true;
+
+		} catch (IOException e) {
+			System.out.println("Error with streams");
+			return false;
+		} catch (ClassNotFoundException e) {
+			System.out.println("Could not cast to EncryptedPacket. Class not found");
+			return false;
+		}
 	}
 
 	/**
@@ -125,11 +215,12 @@ public class Peer {
 	 * @param alias the name of the conversation file
 	 */
 	public synchronized void trySendToServers(String msg, String alias) {
-		SSLSocket[] servers = connectToBackupServer();
-		Packet p = new Packet(name, alias + ".conversation", PacketType.RET_FILE);
-
 		List<ObjectOutputStream> outputStreams = new ArrayList<ObjectOutputStream>();
-
+		List<ObjectInputStream> inputStreams = new ArrayList<ObjectInputStream>();
+		
+		// TODO: if all servers are down switch to a local backup
+		SSLSocket[] servers = connectToBackupServer();
+		
 		// check if any server has the file
 		// if one server has the file stop loop
 		// retrieve file
@@ -141,43 +232,27 @@ public class Peer {
 		String encData = null;
 		for (int i = 0; i < servers.length; i++) {
 			SSLSocket currentServer = servers[i];
+			
 			if (currentServer == null) {
 				continue; // server connection was not established (might be down for maintenance)
 			}
 
-			String serverAlias = serverAliases.get(i);
-
-			System.out.println("Searching for existing file in server (" + i + ") " + serverAlias);
-
-			EncryptedPacket encRequest = encryptPacket(serverAlias, p);
-			// TODO: if all servers are down switch to a local backup
-
 			try {
+				String serverAlias = serverAliases.get(i);
 				ObjectOutputStream out = new ObjectOutputStream(currentServer.getOutputStream());
 				ObjectInputStream in = new ObjectInputStream(currentServer.getInputStream());
 
 				System.out.println("Saving server socket streams");
 				outputStreams.add(out);
-				System.out.println("Sending file request");
-				out.writeObject(encRequest);
+				inputStreams.add(in);
 
-				System.out.println("Waiting for server response...");
-				EncryptedPacket encResponse = (EncryptedPacket) in.readObject();
-				Packet response = tryReadMessage(encResponse);
-				System.out.println("Server response detected. Reading response...");
-
-				if ((encData = response.get_data()) != null) {
-					System.out.println("Server has backup file. Skipping other servers...");
+				if ((encData = retrieveFile(serverAlias, alias + ".conversation", out, in)) != null) {
 					break;
 				}
-
-				System.out.println("Server did not have backup file. Asking other servers...");
 
 			} catch (IOException e) {
 				System.out.println("Error with streams");
 				e.printStackTrace();
-			} catch (ClassNotFoundException e) {
-				System.out.println("Could not cast to EncryptedPacket. Class not found");
 			}
 		}
 
@@ -209,7 +284,6 @@ public class Peer {
 		}
 
 		System.out.println("Encrypting updated file...");
-		// enc file
 		String encFile = null;
 		try {
 			encFile = HybridEncryption.encryptFile(conversationFile, trustStore.getCertificate(name).getPublicKey());
@@ -224,6 +298,7 @@ public class Peer {
 		}
 
 		System.out.println("Sending file to backup servers...");
+		int successfullBackups = 0;
 		for (int i = 0; i < servers.length; i++) {
 			if (servers[i] == null) {
 				continue;
@@ -233,14 +308,19 @@ public class Peer {
 			// send file
 			System.out.println("Sending file to server (" + i + ") " + serverAlias);
 			ObjectOutputStream out = outputStreams.get(i);
+			ObjectInputStream in = inputStreams.get(i);
 			EncryptedPacket encFilePacket = encryptPacket(serverAlias, alias + ".conversation " + encFile,
 					PacketType.MSG);
 
+			if (sendFileToServer(serverAlias, encFilePacket, out, in)) {
+				successfullBackups++;
+				System.out.println("File backup successful. Servers[" + successfullBackups + "/3]");
+			}
+
 			try {
-				out.writeObject(encFilePacket);
+				servers[i].close();
 			} catch (IOException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
+				System.out.println("Error closing connection to backup server "+  i);
 			}
 		}
 	}
@@ -277,9 +357,11 @@ public class Peer {
 					System.out.println("Error sending message or message was blank/empty");
 					continue;
 				}
-				trySendToServers(name + ":" + msg, alias);
-				// MessageLogger.write_message_log(name + ": " + msg, ack.get_sender() +
-				// ".conversation");
+				
+				
+				//trySendToServers(name + ":" + msg, alias);
+				//local backup
+				MessageLogger.write_message_log(name + ": " + msg, ack.get_sender() +".conversation");
 				break;
 			}
 		}

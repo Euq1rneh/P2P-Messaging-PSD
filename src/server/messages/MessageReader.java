@@ -33,9 +33,27 @@ public class MessageReader implements Runnable {
 				System.out.println("Received packet from client");
 				Packet p = Encryption.tryReadMessage(packet);
 
-				Packet response = processMessage(p);
+				if (p == null) {
+					EncryptedPacket errorPacket = new EncryptedPacket(null, null, null);
+					out.writeObject(errorPacket);
+					continue;
+				}
+
+				Packet response = new Packet("server", "", PacketType.OP_ERROR);
+				EncryptedPacket encryptedResponse = new EncryptedPacket(null, null, null);
+
+				response = processMessage(p);
 				
-				out.writeObject(Encryption.encryptPacket(p, p.get_sender()));
+				//error while processing message
+				if (response == null) {
+					out.writeObject(encryptedResponse);
+					continue;
+				}
+				
+				
+				encryptedResponse = Encryption.encryptPacket(response, p.get_sender());
+
+				out.writeObject(encryptedResponse);
 			}
 		} catch (IOException e) {
 			System.out.println("Client connection closed");
@@ -49,7 +67,12 @@ public class MessageReader implements Runnable {
 
 		switch (p.get_packet_type()) {
 		case PacketType.RET_FILE:
-
+			String fileContents = ServerFiles.retrieve(p.get_sender(), p.get_data());
+			
+			if(fileContents != null) {
+				response = new Packet("server", fileContents, PacketType.RET_FILE);				
+			}
+			
 			break;
 		case PacketType.BACKUP:
 			response = new Packet("server", "", PacketType.ACK);
