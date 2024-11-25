@@ -359,7 +359,7 @@ public class Peer {
 				}
 				
 				
-				//trySendToServers(name + ":" + msg, alias);
+				trySendToServers(name + ":" + msg, alias);
 				//local backup
 				MessageLogger.write_message_log(name + ": " + msg, ack.get_sender() +".conversation");
 				break;
