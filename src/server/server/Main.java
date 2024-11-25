@@ -79,7 +79,7 @@ public class Main {
 		while (!serverSocket.isClosed()) {
 			try {
 				SSLSocket clientSocket = (SSLSocket) serverSocket.accept();
-
+				System.out.println("New client connection");
 				new Thread(new MessageReader(clientSocket, running)).start();
 			} catch (SocketException e) {
 				// this exception hopefully will only be thrown when quiting the program

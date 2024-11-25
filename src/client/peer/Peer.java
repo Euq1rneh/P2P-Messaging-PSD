@@ -138,10 +138,10 @@ public class Peer {
 		try {
 
 			System.out.println("Sending file request");
-			out.writeObject(encRequest);
+			outputStream.writeObject(encRequest);
 
 			System.out.println("Waiting for server response...");
-			EncryptedPacket encResponse = (EncryptedPacket) in.readObject();
+			EncryptedPacket encResponse = (EncryptedPacket) inputStream.readObject();
 
 			if (encResponse.getEncryptedData() == null || encResponse.getEncryptedAESKey() == null
 					|| encResponse.getIv() == null) {
@@ -180,10 +180,10 @@ public class Peer {
 			ObjectInputStream inputStream) {
 
 		try {
-			out.writeObject(packet);
+			outputStream.writeObject(packet);
 
 			// TODO receive ACK
-			EncryptedPacket encResponse = (EncryptedPacket) in.readObject();
+			EncryptedPacket encResponse = (EncryptedPacket) inputStream.readObject();
 
 			Packet response = tryReadMessage(encResponse);
 
