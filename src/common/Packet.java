@@ -62,7 +62,7 @@ public class Packet {
     }
 
     public PacketType get_packet_type(){
-        return get_packet_type();
+        return packetType;
     }
     
     public byte[] getBytes() {

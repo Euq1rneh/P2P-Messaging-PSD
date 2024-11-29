@@ -9,7 +9,7 @@ import javax.net.ssl.SSLSocket;
 import common.EncryptedPacket;
 import common.Packet;
 import common.PacketType;
-import server.cypto.Encryption;
+import server.crypto.Encryption;
 
 public class MessageReader implements Runnable {
 	private final SSLSocket socket;
@@ -39,7 +39,7 @@ public class MessageReader implements Runnable {
 					continue;
 				}
 
-				Packet response = new Packet("server", "", PacketType.OP_ERROR);
+				Packet response;
 				EncryptedPacket encryptedResponse = new EncryptedPacket(null, null, null);
 
 				response = processMessage(p);
@@ -49,7 +49,6 @@ public class MessageReader implements Runnable {
 					out.writeObject(encryptedResponse);
 					continue;
 				}
-				
 				
 				encryptedResponse = Encryption.encryptPacket(response, p.get_sender());
 
@@ -67,6 +66,7 @@ public class MessageReader implements Runnable {
 
 		switch (p.get_packet_type()) {
 		case PacketType.RET_FILE:
+			System.out.println("Processing file retrieval request");
 			String fileContents = ServerFiles.retrieve(p.get_sender(), p.get_data());
 			
 			if(fileContents != null) {
@@ -75,7 +75,15 @@ public class MessageReader implements Runnable {
 			
 			break;
 		case PacketType.BACKUP:
-			response = new Packet("server", "", PacketType.ACK);
+			System.out.println("Processing file backup request");
+			String[] args = p.get_data().split(" ");
+			String filename = args[0];
+			String contents = args[1];
+			
+			if(ServerFiles.backup(p.get_sender(), filename, contents)) {
+				response = new Packet("server", "", PacketType.ACK);
+			}
+			
 			break;
 		default:
 			System.out.println("Could not process packet. Did not recognize type " + p.get_packet_type().toString());

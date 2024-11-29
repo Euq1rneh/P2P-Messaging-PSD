@@ -17,7 +17,7 @@ import javax.net.ssl.TrustManagerFactory;
 
 import client.peer.Peer;
 import common.Stores;
-import server.cypto.Encryption;
+import server.crypto.Encryption;
 import server.messages.MessageReader;
 import server.messages.ServerFiles;
 import server.network.ConnectionManager;
@@ -65,14 +65,22 @@ public class Main {
 			return;
 		}
 		
-		int in_port = Integer.parseInt(args[1]);
-		keyStore = Stores.tryLoadKeystore(args[2], args[3]);
-		trustStore = Stores.tryLoadTrustStore(args[4], "");
+		String aliasStr = args[0];
+		String portStr = args[1];
+		String ksPath = args[2];
+		String ksPassword = args[3];
+		String tsPath = args[4];
 		
-		createTrustManager(args[3], keyStore, trustStore);
+		System.out.printf("%s | %s | %s | %s | %s\n", aliasStr, portStr, ksPath, ksPassword, tsPath);
+		
+		int in_port = Integer.parseInt(portStr);
+		keyStore = Stores.tryLoadKeystore(ksPath, ksPassword);
+		trustStore = Stores.tryLoadTrustStore(tsPath, "");
+		
+		createTrustManager(ksPassword, keyStore, trustStore);
 		
 		ServerFiles.createDirs();
-		Encryption.setConfig(args[0], args[2], keyStore, trustStore);
+		Encryption.setConfig(aliasStr, ksPassword, keyStore, trustStore);
 		
 		serverSocket = ConnectionManager.createServerSocket(in_port, keyStore, keyManagers, trustManagers);
 		System.out.println("Started backup server");

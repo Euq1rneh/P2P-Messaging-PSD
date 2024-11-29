@@ -281,6 +281,12 @@ public class Main {
 				peer.close();
 				break;
 			} else if (command_args[0].equals(":t")) {
+				
+				if(command_args.length != 4) {
+					System.out.println("Missing arguments for talk command: :t <ip> <port> <name>");
+					continue;
+				}
+				
 				String address = command_args[1];
 				int port = 0;
 				try {

@@ -1,4 +1,4 @@
-package server.cypto;
+package server.crypto;
 
 import java.security.KeyStore;
 import java.security.KeyStoreException;
@@ -30,9 +30,9 @@ public class Encryption {
 		Encryption.truststore = truststore;
 	}
 	
-	public static EncryptedPacket encryptPacket(Packet packet, String alias) {
+	public static EncryptedPacket encryptPacket(Packet packet, String receiverAlias) {
 		try {
-			PublicKey publicKey = truststore.getCertificate(alias).getPublicKey();
+			PublicKey publicKey = truststore.getCertificate(receiverAlias).getPublicKey();
 			
 			KeyGenerator keyGen = KeyGenerator.getInstance("AES");
 			keyGen.init(256);
@@ -57,11 +57,12 @@ public class Encryption {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+		System.out.println("Error encrypting packet");
 		return null;
 	}
-	
-	private static Packet decryptPacket(EncryptedPacket encryptedPacket, PrivateKey privateKey) {
-		try {			
+
+	public static Packet decryptPacket(EncryptedPacket encryptedPacket, PrivateKey privateKey) {
+		try {
 			// Step 1: Decrypt the AES key with RSA
 			Cipher rsaCipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding");
 			rsaCipher.init(Cipher.UNWRAP_MODE, privateKey);
@@ -82,12 +83,14 @@ public class Encryption {
 		return null;
 	}
 	
+	
 	public static Packet tryReadMessage(EncryptedPacket message) {
-
+		System.out.println("Trying to decode message from client");
 		try {
+			
 			PrivateKey prk = (PrivateKey) keystore.getKey(name, password.toCharArray());
 			Packet p = decryptPacket(message, prk);
-
+			System.out.println("Message decoded successfuly");
 			return p;
 		} catch (UnrecoverableKeyException | KeyStoreException | NoSuchAlgorithmException e) {
 			e.printStackTrace();

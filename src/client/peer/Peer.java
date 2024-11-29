@@ -131,40 +131,41 @@ public class Peer {
 		Packet p = new Packet(name, filename, PacketType.RET_FILE);
 
 		String encData = null;
-		System.out.println("Searching for existing file in server " + serverAlias);
+//		System.out.println("Searching for existing file in server " + serverAlias);
 
 		EncryptedPacket encRequest = encryptPacket(serverAlias, p);
 		
 		try {
 
-			System.out.println("Sending file request");
+//			System.out.println("Sending file request");
 			outputStream.writeObject(encRequest);
 
-			System.out.println("Waiting for server response...");
+//			System.out.println("Waiting for server response...");
 			EncryptedPacket encResponse = (EncryptedPacket) inputStream.readObject();
 
 			if (encResponse.getEncryptedData() == null || encResponse.getEncryptedAESKey() == null
 					|| encResponse.getIv() == null) {
 
 				// server could not decode message
+//				System.out.println("Server could not decode message from client");
 				return null;
 			}
 
 			Packet response = tryReadMessage(encResponse);
 			
-			System.out.println("Server response detected. Reading response...");
+//			System.out.println("Server response detected. Reading response...");
 			
 			if(response == null) {
-				System.out.println("Error while trying to read response from server");
+//				System.out.println("Error while trying to read response from server");
 				return null;
 			}
 
 			if ((encData = response.get_data()) != null) {
-				System.out.println("Server has backup file. Skipping other servers...");
+//				System.out.println("Server has backup file. Skipping other servers...");
 				return encData;
 			}
 
-			System.out.println("Server did not have backup file. Asking other servers...");
+//			System.out.println("Server did not have backup file. Asking other servers...");
 
 		} catch (IOException e) {
 			System.out.println("Error with streams");
@@ -242,7 +243,7 @@ public class Peer {
 				ObjectOutputStream out = new ObjectOutputStream(currentServer.getOutputStream());
 				ObjectInputStream in = new ObjectInputStream(currentServer.getInputStream());
 
-				System.out.println("Saving server socket streams");
+				//System.out.println("Saving server socket streams");
 				outputStreams.add(out);
 				inputStreams.add(in);
 
@@ -260,13 +261,13 @@ public class Peer {
 
 		if (encData == null) {
 			// criar file
-			System.out.println("Creating new .conversation file");
-			conversationFile = new File(alias + ".conversation");
+			//System.out.println("Creating new .conversation file");
+			conversationFile = new File("conversations/"+alias + ".conversation");
 		} else {
 			// decrypt file
-			System.out.println("Decrypting .conversation file");
+			//System.out.println("Decrypting .conversation file");
 			try {
-				conversationFile = HybridEncryption.decryptFile(encData,
+				conversationFile = HybridEncryption.decryptFile(alias + ".conversation",encData,
 						(PrivateKey) keyStore.getKey(name, password.toCharArray()));
 			} catch (UnrecoverableKeyException | KeyStoreException | NoSuchAlgorithmException e) {
 				e.printStackTrace();
@@ -274,8 +275,8 @@ public class Peer {
 			}
 		}
 
-		System.out.println("Writing new message...");
-		try (BufferedWriter writer = new BufferedWriter(new FileWriter(conversationFile))) {
+		//System.out.println("Writing new message...");
+		try (BufferedWriter writer = new BufferedWriter(new FileWriter(conversationFile, true))) {
 			// add message
 			writer.write(msg);
 			writer.newLine();
@@ -283,7 +284,7 @@ public class Peer {
 			System.err.println("An error occurred while writing the message to the file: " + e.getMessage());
 		}
 
-		System.out.println("Encrypting updated file...");
+		//System.out.println("Encrypting updated file...");
 		String encFile = null;
 		try {
 			encFile = HybridEncryption.encryptFile(conversationFile, trustStore.getCertificate(name).getPublicKey());
@@ -297,7 +298,7 @@ public class Peer {
 			return;
 		}
 
-		System.out.println("Sending file to backup servers...");
+		//System.out.println("Sending file to backup servers...");
 		int successfullBackups = 0;
 		for (int i = 0; i < servers.length; i++) {
 			if (servers[i] == null) {
@@ -306,15 +307,15 @@ public class Peer {
 
 			String serverAlias = serverAliases.get(i);
 			// send file
-			System.out.println("Sending file to server (" + i + ") " + serverAlias);
+			//System.out.println("Sending file to server (" + i + ") " + serverAlias);
 			ObjectOutputStream out = outputStreams.get(i);
 			ObjectInputStream in = inputStreams.get(i);
 			EncryptedPacket encFilePacket = encryptPacket(serverAlias, alias + ".conversation " + encFile,
-					PacketType.MSG);
+					PacketType.BACKUP);
 
 			if (sendFileToServer(serverAlias, encFilePacket, out, in)) {
 				successfullBackups++;
-				System.out.println("File backup successful. Servers[" + successfullBackups + "/3]");
+				//System.out.println("File backup successful. Servers[" + successfullBackups + "/3]");
 			}
 
 			try {
@@ -361,7 +362,7 @@ public class Peer {
 				
 				trySendToServers(name + ":" + msg, alias);
 				//local backup
-				MessageLogger.write_message_log(name + ": " + msg, ack.get_sender() +".conversation");
+				//MessageLogger.write_message_log(name + ": " + msg, ack.get_sender() +".conversation");
 				break;
 			}
 		}
@@ -397,6 +398,7 @@ public class Peer {
 	public EncryptedPacket encryptPacket(String alias, Packet packet) {
 
 		try {
+//			System.out.println("Retrieving pk from " + alias);
 			PublicKey pk = trustStore.getCertificate(alias).getPublicKey();
 
 			if (pk == null) {
@@ -404,8 +406,15 @@ public class Peer {
 				System.exit(-1);
 			}
 
+//			System.out.println("Encrypting packet");
 			EncryptedPacket encPacket = HybridEncryption.encryptPacket(packet, pk);
 
+			if(encPacket == null) {
+				return null;
+			}
+			
+//			System.out.println("Packet encrypted");
+			
 			return encPacket;
 		} catch (KeyStoreException e) {
 			e.printStackTrace();

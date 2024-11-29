@@ -1,8 +1,10 @@
 package server.messages;
 
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
 
 public class ServerFiles {
@@ -85,5 +87,41 @@ public class ServerFiles {
 
 		return null;
 	}
+	
+	/**
+	 * Creates a backup of the file. If it already exists replaces it with a new copy
+	 * @param user the name of the user that is saving the file (used for searching for their directory)
+	 * @param filename the name of the file
+	 * @param content the encrypted contents of the file
+	 * @return true if succeeded false otherwise
+	 */
+	public static boolean backup(String user, String filename, String content) {
+	    try {
+	        if (userDirExists(user)) {
+	            File backupFile = new File(ROOT_DIRECTORY + FILE_SEPARATOR + user + FILE_SEPARATOR + filename);
+	            
+	            try (BufferedWriter writer = new BufferedWriter(new FileWriter(backupFile))) {
+	                writer.write(content);
+	            }
+	            
+	            return true;
+	        } else {
+	            File userDir = new File(ROOT_DIRECTORY + FILE_SEPARATOR + user);
+	            if (userDir.mkdirs()) {
+	                File backupFile = new File(userDir, filename);
+	                try (BufferedWriter writer = new BufferedWriter(new FileWriter(backupFile))) {
+	                    writer.write(content);
+	                }
+	                
+	                return true;
+	            }
+	        }
+	    } catch (IOException e) {
+	        System.err.println("Error creating backup: " + e.getMessage());
+	    }
+	    
+	    return false;
+	}
+
 
 }

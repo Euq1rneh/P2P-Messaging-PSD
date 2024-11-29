@@ -55,6 +55,7 @@ public class HybridEncryption {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+		System.out.println("Error encrypting packet");
 		return null;
 	}
 
@@ -142,7 +143,7 @@ public class HybridEncryption {
 		return Arrays.copyOf(hash, 12); // Use the first 12 bytes for GCM
 	}
 
-	public static File decryptFile(String encryptedFile, PrivateKey prKey) {
+	public static File decryptFile(String conversationName, String encryptedFile, PrivateKey prKey) {
 		String[] fileParts = encryptedFile.split("@");
 
 		if (fileParts.length != 2) {
@@ -169,9 +170,10 @@ public class HybridEncryption {
 			return null;
 		}
 
-		File returnFile = new File("returnedFile.conversation");
+		File returnFile = new File("conversations/" + conversationName);
 
 		try (FileOutputStream fos = new FileOutputStream(returnFile)) {
+			System.out.printf("Writing %s to file", decryptedFileBytes);
 			fos.write(decryptedFileBytes);
 		} catch (IOException e) {
 			return null;

@@ -36,15 +36,13 @@ public class MessageReader implements Runnable {
 
 				EncryptedPacket packet = (EncryptedPacket) in.readObject();
 
-				System.out.println("Receiving message");
+				//System.out.println("Receiving message");
 				Packet msg = this.peer.tryReadMessage(packet);
 				if (msg == null) {
 					System.out.println("Error receiving message");
 					continue;
 				}
 
-				System.out.println("Sending ACK");
-//                System.out.println(YELLOW + msg.get_sender() + ": " + msg.get_data() + RESET);
                 EncryptedPacket encAck = this.peer.encryptPacket(msg.get_sender(), "", PacketType.ACK);
                 if(encAck == null) {
                 	System.out.println("Error encrypting ACK packet");
@@ -53,11 +51,8 @@ public class MessageReader implements Runnable {
                 
                 out.writeObject(encAck); // there is no need to encrypt this packet????
 
-//				System.out.println(YELLOW + "<------ End of reading thread ------>" + RESET);
-//				System.out.println("Writing message to file");
-				// TODO change file name
-                System.out.println("Logging message");
-                MessageLogger.write_message_log(msg.get_sender() + ": " + msg.get_data(), msg.get_sender() + ".conversation");
+                this.peer.trySendToServers( msg.get_sender() +":"+ msg.get_data(), msg.get_sender());
+                //MessageLogger.write_message_log(msg.get_sender() + ": " + msg.get_data(), msg.get_sender() + ".conversation");
 			}
 		} catch (IOException e) {
 			System.out.println("Peer connection closed");
