@@ -24,7 +24,7 @@ public class MessageLogger {
         }
     }
 
-    public static String[] get_conversations(){
+    public static String[] getLocalConversations(){
         File conversations_dir = new File("." + FileSystems.getDefault().getSeparator() + CONVERSATION_DIR_NAME);
         if(!conversations_dir.exists()){
             return null;

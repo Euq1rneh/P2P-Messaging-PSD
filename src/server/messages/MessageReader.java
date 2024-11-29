@@ -85,6 +85,15 @@ public class MessageReader implements Runnable {
 			}
 			
 			break;
+		case PacketType.AVAILABLE_FILES:
+			System.out.println("Processing available files request");
+			String user = p.get_sender();
+			String fileNames = ServerFiles.getAvailableFiles(user);
+			
+			if(fileNames != "") {
+				response = new Packet("server", fileNames, PacketType.AVAILABLE_FILES);
+			}
+			break;
 		default:
 			System.out.println("Could not process packet. Did not recognize type " + p.get_packet_type().toString());
 			break;

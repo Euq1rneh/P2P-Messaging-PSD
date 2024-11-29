@@ -18,6 +18,7 @@ import java.security.UnrecoverableKeyException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Scanner;
@@ -494,8 +495,52 @@ public class Peer {
 		return 0;
 	}
 
+	private void checkForConversations() {
+		HashSet<String> filesInServers = new HashSet<String>();
+		List<ObjectOutputStream> outputStreams = new ArrayList<ObjectOutputStream>();
+		List<ObjectInputStream> inputStreams = new ArrayList<ObjectInputStream>();
+		
+		SSLSocket[] servers = connectToBackupServer();
+		
+		// check if any server has the file
+		// retrieve filename
+		// decrypt
+		// add name
+		//retrieve all files 
+
+//		String encData = null;
+//		for (int i = 0; i < servers.length; i++) {
+//			SSLSocket currentServer = servers[i];
+//			
+//			if (currentServer == null) {
+//				continue; // server connection was not established (might be down for maintenance)
+//			}
+//
+//			try {
+//				String serverAlias = serverAliases.get(i);
+//				ObjectOutputStream out = new ObjectOutputStream(currentServer.getOutputStream());
+//				ObjectInputStream in = new ObjectInputStream(currentServer.getInputStream());
+//
+//				//System.out.println("Saving server socket streams");
+//				outputStreams.add(out);
+//				inputStreams.add(in);
+//
+//				if ((encData = retrieveFile(serverAlias, alias + ".conversation", out, in)) != null) {
+//					break;
+//				}
+//
+//			} catch (IOException e) {
+//				System.out.println("Error with streams");
+//				e.printStackTrace();
+//			}
+//		}
+
+		
+	}
+	
 	public void list_conversations() {
-		conversations = MessageLogger.get_conversations();
+		//TODO: change get conversations to retrieve any missing files from the backup servers
+		conversations = MessageLogger.getLocalConversations();
 		System.out.println("----------- Conversations -----------");
 		if (conversations == null) {
 			System.out.println("No conversations were found.");
@@ -531,6 +576,7 @@ public class Peer {
 
 	}
 
+	
 	/**
 	 * Starts the peer by opening a socket that is responsible for accepting
 	 * connections and reading the incoming messages

@@ -123,5 +123,33 @@ public class ServerFiles {
 	    return false;
 	}
 
+	/**
+	 * retrieves the names of any available files per user
+	 * @param user the name of the users that is requesting his files
+	 * @return the names of the files separated by spaces
+	 */
+	public static String getAvailableFiles(String user) {
+	    if (!userDirExists(user)) {
+	        return "";
+	    }
+	    
+	    File userDir = new File(ROOT_DIRECTORY + FILE_SEPARATOR + user);
+	    File[] files = userDir.listFiles();
+	    
+	    if (files == null || files.length == 0) {
+	        return "";
+	    }
+	    
+	    StringBuilder fileNames = new StringBuilder();
+	    for (File file : files) {
+	        if (file.isFile()) {
+	            fileNames.append(file.getName()).append(" ");
+	        }
+	    }
+	    
+	    return fileNames.toString().trim();
+	}
+
+
 
 }
