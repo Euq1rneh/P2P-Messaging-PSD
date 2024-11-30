@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.security.KeyStore;
+import java.util.Arrays;
 import java.util.Properties;
 import java.util.Scanner;
 
@@ -304,6 +305,12 @@ public class Main {
 				peer.connect(address, port);
 				peer.try_send_message(sc, alias);
 			} else if (command_args[0].equals(":o")) {
+				
+				if(command_args.length != 2) {
+					System.out.println("Missing arguments for open command: :o <conversation ID>");
+					continue;
+				}
+				
 				int conversation_id = Integer.parseInt(command_args[1]);
 
 				clearTerminal();
@@ -313,6 +320,13 @@ public class Main {
 				// likely be encrypted
 				// peer.connect(address, port);
 				// peer.try_send_message();
+			} else if (command_args[0].equals(":s")) {
+				if(command_args.length <= 1) {
+					System.out.println("Missing arguments for search command: :s <keyword(s)>");
+					continue;
+				}
+				peer.searchInConversations(String.join(" ", Arrays.copyOfRange(command_args, 1, command_args.length)));
+			
 			} else if (command.equals("")) {
 				// functions as an update to the terminal
 				clearTerminal();

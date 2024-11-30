@@ -554,6 +554,67 @@ public class Peer {
 		}
 		System.out.println("------------------------------------");
 	}
+	
+	public void searchInConversations(String keywords) {
+		
+		SSLSocket[] servers = connectToBackupServer();
+		
+		// current idea is that if our cloud is down, we search on the local copy which isnt encrypted
+		System.out.println(backupServersDown(servers));
+		if (backupServersDown(servers)) {
+			System.out.println("Searching locally");
+			searchLocal(keywords);
+		} else {
+			// example function name that would do symmetric searchable encryption in our cloud's files
+			// searchRemote(keywords);
+		}
+	}
+	
+	private boolean backupServersDown(SSLSocket[] backups) {
+		return backups == null || Arrays.stream(backups).allMatch(e -> e == null); // might be unnecessary considering it's 1 line
+	}
+	
+	private void searchLocal(String keywords) {
+		// i imagine this has a bit of repeated code
+		// also not sure if this conversation related function belongs in Peer or somewhere else
+		Boolean found = false;
+		for (String conversation : conversations) {
+			String contents = MessageLogger.read_message_log(conversation + ".conversation");
+			
+			int occurrences = countOccurrences(contents, keywords);
+			if (occurrences == 0) {
+				continue;
+			}
+			found = true;
+			System.out.println("The keyword(s) provided were found " + occurrences + " times in the conversation with " + conversation + ".\n");
+		}
+		
+		if (!found) {
+			System.out.println("The keywords '" + keywords + "' were not found.");
+		}
+	}
+	
+	private int countOccurrences(String conversation, String keywords) {
+		conversation = conversation.toLowerCase();  // this to make it case insensitive
+		keywords = keywords.toLowerCase();    
+		
+		String[] lines = conversation.split("\n");
+        int count = 0;
+
+        for (String line : lines) {
+            String trimmedLine = line.replaceAll("^[^:]+:", "").trim(); // regex came from gpt, i needed to remove usernames 
+            															// and colons from the search since that would affect
+            															// the search
+
+            int index = trimmedLine.indexOf(keywords); // returns -1 when it doesnt find it
+            while (index >= 0) {
+                count++;
+                index = trimmedLine.indexOf(keywords, index + keywords.length()); // offset makes it move past the last found occurrence
+            }
+        }
+
+        return count;
+	}
 
 	public void createTrustManager(String kpassword, KeyStore keystore, KeyStore truststore) {
 		KeyManagerFactory keyManager;
