@@ -20,6 +20,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Scanner;
 import java.util.stream.Collectors;
@@ -135,7 +136,7 @@ public class Peer {
 //		System.out.println("Searching for existing file in server " + serverAlias);
 
 		EncryptedPacket encRequest = encryptPacket(serverAlias, p);
-		
+
 		try {
 
 //			System.out.println("Sending file request");
@@ -153,10 +154,10 @@ public class Peer {
 			}
 
 			Packet response = tryReadMessage(encResponse);
-			
+
 //			System.out.println("Server response detected. Reading response...");
-			
-			if(response == null) {
+
+			if (response == null) {
 //				System.out.println("Error while trying to read response from server");
 				return null;
 			}
@@ -219,10 +220,10 @@ public class Peer {
 	public synchronized void trySendToServers(String msg, String alias) {
 		List<ObjectOutputStream> outputStreams = new ArrayList<ObjectOutputStream>();
 		List<ObjectInputStream> inputStreams = new ArrayList<ObjectInputStream>();
-		
+
 		// TODO: if all servers are down switch to a local backup
 		SSLSocket[] servers = connectToBackupServer();
-		
+
 		// check if any server has the file
 		// if one server has the file stop loop
 		// retrieve file
@@ -234,7 +235,7 @@ public class Peer {
 		String encData = null;
 		for (int i = 0; i < servers.length; i++) {
 			SSLSocket currentServer = servers[i];
-			
+
 			if (currentServer == null) {
 				continue; // server connection was not established (might be down for maintenance)
 			}
@@ -244,7 +245,7 @@ public class Peer {
 				ObjectOutputStream out = new ObjectOutputStream(currentServer.getOutputStream());
 				ObjectInputStream in = new ObjectInputStream(currentServer.getInputStream());
 
-				//System.out.println("Saving server socket streams");
+				// System.out.println("Saving server socket streams");
 				outputStreams.add(out);
 				inputStreams.add(in);
 
@@ -262,13 +263,13 @@ public class Peer {
 
 		if (encData == null) {
 			// criar file
-			//System.out.println("Creating new .conversation file");
-			conversationFile = new File("conversations/"+alias + ".conversation");
+			// System.out.println("Creating new .conversation file");
+			conversationFile = new File("conversations/" + alias + ".conversation");
 		} else {
 			// decrypt file
-			//System.out.println("Decrypting .conversation file");
+			// System.out.println("Decrypting .conversation file");
 			try {
-				conversationFile = HybridEncryption.decryptFile(alias + ".conversation",encData,
+				conversationFile = HybridEncryption.decryptFile(alias + ".conversation", encData,
 						(PrivateKey) keyStore.getKey(name, password.toCharArray()));
 			} catch (UnrecoverableKeyException | KeyStoreException | NoSuchAlgorithmException e) {
 				e.printStackTrace();
@@ -276,7 +277,7 @@ public class Peer {
 			}
 		}
 
-		//System.out.println("Writing new message...");
+		// System.out.println("Writing new message...");
 		try (BufferedWriter writer = new BufferedWriter(new FileWriter(conversationFile, true))) {
 			// add message
 			writer.write(msg);
@@ -285,7 +286,7 @@ public class Peer {
 			System.err.println("An error occurred while writing the message to the file: " + e.getMessage());
 		}
 
-		//System.out.println("Encrypting updated file...");
+		// System.out.println("Encrypting updated file...");
 		String encFile = null;
 		try {
 			encFile = HybridEncryption.encryptFile(conversationFile, trustStore.getCertificate(name).getPublicKey());
@@ -299,7 +300,7 @@ public class Peer {
 			return;
 		}
 
-		//System.out.println("Sending file to backup servers...");
+		// System.out.println("Sending file to backup servers...");
 		int successfullBackups = 0;
 		for (int i = 0; i < servers.length; i++) {
 			if (servers[i] == null) {
@@ -308,7 +309,7 @@ public class Peer {
 
 			String serverAlias = serverAliases.get(i);
 			// send file
-			//System.out.println("Sending file to server (" + i + ") " + serverAlias);
+			// System.out.println("Sending file to server (" + i + ") " + serverAlias);
 			ObjectOutputStream out = outputStreams.get(i);
 			ObjectInputStream in = inputStreams.get(i);
 			EncryptedPacket encFilePacket = encryptPacket(serverAlias, alias + ".conversation " + encFile,
@@ -316,13 +317,14 @@ public class Peer {
 
 			if (sendFileToServer(serverAlias, encFilePacket, out, in)) {
 				successfullBackups++;
-				//System.out.println("File backup successful. Servers[" + successfullBackups + "/3]");
+				// System.out.println("File backup successful. Servers[" + successfullBackups +
+				// "/3]");
 			}
 
 			try {
 				servers[i].close();
 			} catch (IOException e) {
-				System.out.println("Error closing connection to backup server "+  i);
+				System.out.println("Error closing connection to backup server " + i);
 			}
 		}
 	}
@@ -359,11 +361,11 @@ public class Peer {
 					System.out.println("Error sending message or message was blank/empty");
 					continue;
 				}
-				
-				
+
 				trySendToServers(name + ":" + msg, alias);
-				//local backup
-				//MessageLogger.write_message_log(name + ": " + msg, ack.get_sender() +".conversation");
+				// local backup
+				// MessageLogger.write_message_log(name + ": " + msg, ack.get_sender()
+				// +".conversation");
 				break;
 			}
 		}
@@ -410,12 +412,12 @@ public class Peer {
 //			System.out.println("Encrypting packet");
 			EncryptedPacket encPacket = HybridEncryption.encryptPacket(packet, pk);
 
-			if(encPacket == null) {
+			if (encPacket == null) {
 				return null;
 			}
-			
+
 //			System.out.println("Packet encrypted");
-			
+
 			return encPacket;
 		} catch (KeyStoreException e) {
 			e.printStackTrace();
@@ -495,51 +497,127 @@ public class Peer {
 		return 0;
 	}
 
-	private void checkForConversations() {
+	private void getAvailableFiles(HashSet<String> filesInServers, HashMap<String, List<String>> filesPerServer,
+			List<ObjectOutputStream> outputStreams, List<ObjectInputStream> inputStreams, SSLSocket[] servers) {
+
+		for (int i = 0; i < servers.length; i++) {
+			SSLSocket currentServer = servers[i];
+
+			if (currentServer == null) {
+				continue; // server connection was not established (might be down for maintenance)
+			}
+
+			try {
+				String serverAlias = serverAliases.get(i);
+				ObjectOutputStream out = new ObjectOutputStream(currentServer.getOutputStream());
+				ObjectInputStream in = new ObjectInputStream(currentServer.getInputStream());
+
+				outputStreams.add(out);
+				inputStreams.add(in);
+				filesPerServer.put(serverAlias, new ArrayList<String>());
+
+				// send files request
+				EncryptedPacket ep = encryptPacket(serverAlias, "", PacketType.AVAILABLE_FILES);
+				if (ep == null) {
+					System.out.println("Error while trying to retrieve " + serverAlias + " key");
+					continue;
+				}
+				System.out.println("Sending available file request to server");
+				out.writeObject(ep);
+
+				EncryptedPacket encResponse = (EncryptedPacket) in.readObject();
+				System.out.println("Reading response from server");
+				Packet p = tryReadMessage(encResponse);
+
+				if (p == null) {
+					System.out.println("Could not read server response");
+					continue;
+				}
+
+				System.out.println("Adding file names");
+				String[] files = p.get_data().split(" ");
+				List<String> fileList = Arrays.asList(files);
+
+				List<String> serverAvailableFiles = filesPerServer.get(serverAlias);
+				serverAvailableFiles.addAll(fileList);
+				filesInServers.addAll(fileList);
+
+				System.out.println("Current available files: " + filesInServers.toString());
+
+			} catch (IOException e) {
+				System.out.println("Error with streams");
+				e.printStackTrace();
+			} catch (ClassNotFoundException e) {
+				e.printStackTrace();
+			}
+		}
+	}
+
+	private int retrieveServerAliasIndex(String serverAlias) {
+		for (Map.Entry<Integer, String> entry : serverAliases.entrySet()) {
+			Integer key = entry.getKey();
+			String val = entry.getValue();
+
+			if (val.equals(serverAlias))
+				return key;
+		}
+
+		return -1;
+	}
+
+	private void retrieveAvailableFiles(HashSet<String> filesInServers, HashMap<String, List<String>> filesPerServer,
+			List<ObjectOutputStream> outputStreams, List<ObjectInputStream> inputStreams, SSLSocket[] servers) {
+		
+		for (Map.Entry<String, List<String>> entry : filesPerServer.entrySet()) {
+			String serverAlias = entry.getKey();
+			List<String> availableFiles = entry.getValue();
+			
+			
+			
+			for (String filename : availableFiles) {
+				if(filesInServers.contains(filename)) {
+					
+					int streamIndex = retrieveServerAliasIndex(serverAlias);
+					
+					if(servers[streamIndex] == null) {
+						continue;//server is not available
+					}
+					
+					String encData = retrieveFile(serverAlias, filename, outputStreams.get(streamIndex), inputStreams.get(streamIndex));
+					
+					try {
+						//TODO: verify if decryptFile writes file to mem
+						File conversationFile = HybridEncryption.decryptFile(filename, encData,
+								(PrivateKey) keyStore.getKey(name, password.toCharArray()));
+						
+						if(conversationFile != null) {
+							//last operation
+							filesInServers.remove(filename);							
+						}
+					} catch (UnrecoverableKeyException | KeyStoreException | NoSuchAlgorithmException e) {
+						e.printStackTrace();
+					}
+				}
+			}
+		}
+	}
+
+	private void checkForConversationsInServers() {
 		HashSet<String> filesInServers = new HashSet<String>();
+		HashMap<String, List<String>> filesPerServer = new HashMap<String, List<String>>();
 		List<ObjectOutputStream> outputStreams = new ArrayList<ObjectOutputStream>();
 		List<ObjectInputStream> inputStreams = new ArrayList<ObjectInputStream>();
-		
+
 		SSLSocket[] servers = connectToBackupServer();
-		
-		// check if any server has the file
-		// retrieve filename
-		// decrypt
-		// add name
-		//retrieve all files 
 
-//		String encData = null;
-//		for (int i = 0; i < servers.length; i++) {
-//			SSLSocket currentServer = servers[i];
-//			
-//			if (currentServer == null) {
-//				continue; // server connection was not established (might be down for maintenance)
-//			}
-//
-//			try {
-//				String serverAlias = serverAliases.get(i);
-//				ObjectOutputStream out = new ObjectOutputStream(currentServer.getOutputStream());
-//				ObjectInputStream in = new ObjectInputStream(currentServer.getInputStream());
-//
-//				//System.out.println("Saving server socket streams");
-//				outputStreams.add(out);
-//				inputStreams.add(in);
-//
-//				if ((encData = retrieveFile(serverAlias, alias + ".conversation", out, in)) != null) {
-//					break;
-//				}
-//
-//			} catch (IOException e) {
-//				System.out.println("Error with streams");
-//				e.printStackTrace();
-//			}
-//		}
-
-		
+		getAvailableFiles(filesInServers, filesPerServer, outputStreams, inputStreams, servers);
+		retrieveAvailableFiles(filesInServers, filesPerServer, outputStreams, inputStreams, servers);
 	}
-	
+
 	public void list_conversations() {
-		//TODO: change get conversations to retrieve any missing files from the backup servers
+		// TODO: change get conversations to retrieve any missing files from the backup
+		// servers
+		checkForConversationsInServers();
 		conversations = MessageLogger.getLocalConversations();
 		System.out.println("----------- Conversations -----------");
 		if (conversations == null) {
@@ -554,66 +632,74 @@ public class Peer {
 		}
 		System.out.println("------------------------------------");
 	}
-	
+
 	public void searchInConversations(String keywords) {
-		
+
 		SSLSocket[] servers = connectToBackupServer();
-		
-		// current idea is that if our cloud is down, we search on the local copy which isnt encrypted
+
+		// current idea is that if our cloud is down, we search on the local copy which
+		// isnt encrypted
 		System.out.println(backupServersDown(servers));
 		if (backupServersDown(servers)) {
 			System.out.println("Searching locally");
 			searchLocal(keywords);
 		} else {
-			// example function name that would do symmetric searchable encryption in our cloud's files
+			// example function name that would do symmetric searchable encryption in our
+			// cloud's files
 			// searchRemote(keywords);
 		}
 	}
-	
+
 	private boolean backupServersDown(SSLSocket[] backups) {
-		return backups == null || Arrays.stream(backups).allMatch(e -> e == null); // might be unnecessary considering it's 1 line
+		return backups == null || Arrays.stream(backups).allMatch(e -> e == null); // might be unnecessary considering
+																					// it's 1 line
 	}
-	
+
 	private void searchLocal(String keywords) {
 		// i imagine this has a bit of repeated code
-		// also not sure if this conversation related function belongs in Peer or somewhere else
+		// also not sure if this conversation related function belongs in Peer or
+		// somewhere else
 		Boolean found = false;
 		for (String conversation : conversations) {
 			String contents = MessageLogger.read_message_log(conversation + ".conversation");
-			
+
 			int occurrences = countOccurrences(contents, keywords);
 			if (occurrences == 0) {
 				continue;
 			}
 			found = true;
-			System.out.println("The keyword(s) provided were found " + occurrences + " times in the conversation with " + conversation + ".\n");
+			System.out.println("The keyword(s) provided were found " + occurrences + " times in the conversation with "
+					+ conversation + ".\n");
 		}
-		
+
 		if (!found) {
 			System.out.println("The keywords '" + keywords + "' were not found.");
 		}
 	}
-	
+
 	private int countOccurrences(String conversation, String keywords) {
-		conversation = conversation.toLowerCase();  // this to make it case insensitive
-		keywords = keywords.toLowerCase();    
-		
+		conversation = conversation.toLowerCase(); // this to make it case insensitive
+		keywords = keywords.toLowerCase();
+
 		String[] lines = conversation.split("\n");
-        int count = 0;
+		int count = 0;
 
-        for (String line : lines) {
-            String trimmedLine = line.replaceAll("^[^:]+:", "").trim(); // regex came from gpt, i needed to remove usernames 
-            															// and colons from the search since that would affect
-            															// the search
+		for (String line : lines) {
+			String trimmedLine = line.replaceAll("^[^:]+:", "").trim(); // regex came from gpt, i needed to remove
+																		// usernames
+																		// and colons from the search since that would
+																		// affect
+																		// the search
 
-            int index = trimmedLine.indexOf(keywords); // returns -1 when it doesnt find it
-            while (index >= 0) {
-                count++;
-                index = trimmedLine.indexOf(keywords, index + keywords.length()); // offset makes it move past the last found occurrence
-            }
-        }
+			int index = trimmedLine.indexOf(keywords); // returns -1 when it doesnt find it
+			while (index >= 0) {
+				count++;
+				index = trimmedLine.indexOf(keywords, index + keywords.length()); // offset makes it move past the last
+																					// found occurrence
+			}
+		}
 
-        return count;
+		return count;
 	}
 
 	public void createTrustManager(String kpassword, KeyStore keystore, KeyStore truststore) {
@@ -637,7 +723,6 @@ public class Peer {
 
 	}
 
-	
 	/**
 	 * Starts the peer by opening a socket that is responsible for accepting
 	 * connections and reading the incoming messages
