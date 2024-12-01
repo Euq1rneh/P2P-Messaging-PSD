@@ -534,6 +534,10 @@ public class Peer {
 					continue;
 				}
 
+				if(p.get_data().equals("")) {
+					continue;//no files available
+				}
+				
 				System.out.println("Adding file names");
 				String[] files = p.get_data().split(" ");
 				List<String> fileList = Arrays.asList(files);
@@ -612,12 +616,21 @@ public class Peer {
 
 		getAvailableFiles(filesInServers, filesPerServer, outputStreams, inputStreams, servers);
 		retrieveAvailableFiles(filesInServers, filesPerServer, outputStreams, inputStreams, servers);
+		
+		for (int i = 0; i < servers.length; i++) {
+			try {
+				if(servers[i] != null) {
+					servers[i].close();					
+				}
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
 	}
 
 	public void list_conversations() {
 		// TODO: change get conversations to retrieve any missing files from the backup
 		// servers
-		checkForConversationsInServers();
 		conversations = MessageLogger.getLocalConversations();
 		System.out.println("----------- Conversations -----------");
 		if (conversations == null) {
@@ -743,6 +756,8 @@ public class Peer {
 
 		// Start the thread that accepts connections
 		connectionAcceptorThread.start();
+		//try retrieve any available files in the servers on startup
+		checkForConversationsInServers();
 	}
 
 	public void close() {
