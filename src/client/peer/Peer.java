@@ -235,17 +235,10 @@ public class Peer {
 		// TODO: if all servers are down switch to a local backup
 		SSLSocket[] servers = connectToBackupServer();
 
-		// check if any server has the file
-		// if one server has the file stop loop
-		// retrieve file
-		// decrypt
-		// add message
-		// encrypt
-		// send to all servers
 		String filename = alias + ".conversation";
 		HashMap<Integer, byte[]> parts = new HashMap<Integer, byte[]>();
-
-//		String encData = null;
+		
+		//loop to retrive available shares
 		for (int i = 0; i < servers.length; i++) {
 			SSLSocket currentServer = servers[i];
 
@@ -278,21 +271,19 @@ public class Peer {
 		}
 
 		File conversationFile = null;
-		boolean canRebuildFile =parts.size() < SHARE_THRESHOLD;
-		// returns the recoverd file bytes
-		byte[] recovered = scheme.join(parts);
-		// key+@+filebytes
-		String encData = Base64.getEncoder().encodeToString(recovered);
-		System.out.println("=======\nAfter share join: " + encData + "=======\n");
+		boolean cannotRebuildFile = parts.size() < SHARE_THRESHOLD;
 		
-		
-		if (!canRebuildFile) {
+		//doesnt have enough shares
+		if (cannotRebuildFile) {
 			// criar file
 			// System.out.println("Creating new .conversation file");
 			conversationFile = new File("conversations/" + alias + ".conversation");
 		} else {
+			byte[] recovered = scheme.join(parts);
+			// key+@+filebytes
+			String encData = Base64.getEncoder().encodeToString(recovered);
+			System.out.println("=======\nAfter share join: " + encData + "=======\n");
 			// decrypt file
-			// System.out.println("Decrypting .conversation file");
 			try {
 				conversationFile = HybridEncryption.decryptFile(alias + ".conversation", encData,
 						(PrivateKey) keyStore.getKey(name, password.toCharArray()));
