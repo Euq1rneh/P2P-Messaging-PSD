@@ -14,9 +14,11 @@ import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.security.SecureRandom;
 import java.security.UnrecoverableKeyException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -34,6 +36,7 @@ import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 
 import client.peer.crypto.HybridEncryption;
+import client.peer.crypto.ShamirScheme;
 import client.peer.messages.MessageLogger;
 import client.peer.network.ConnectionManager;
 import client.peer.threads.ConnectionAcceptorThread;
@@ -42,6 +45,10 @@ import common.Packet;
 import common.PacketType;
 
 public class Peer {
+
+	private static final int SHARE_THRESHOLD = 3; // ALLOWS FOR AT LEAST ONE TO FAIL (SERVER OR CLIENT)
+	private static final int NUM_SHARES = 4; // CLIENT HOLDS 1 AND EACH SERVER HOLDS 1
+
 	private String name;
 	private final int in_port;
 	private ServerSocket peer_in;
@@ -60,6 +67,8 @@ public class Peer {
 	KeyManager[] keyManagers;
 	TrustManager[] trustManagers;
 
+	ShamirScheme scheme;
+
 	public Peer(String name, int in_port, KeyStore keyStore, KeyStore trustStore, String password) {
 		this.name = name;
 		this.in_port = in_port;
@@ -70,6 +79,8 @@ public class Peer {
 		serverAliases.put(0, "amazonServer");
 		serverAliases.put(1, "oracleServer");
 		serverAliases.put(2, "googleServer");
+
+		scheme = new ShamirScheme(new SecureRandom(), NUM_SHARES, SHARE_THRESHOLD);
 	}
 
 	/**
@@ -128,7 +139,7 @@ public class Peer {
 	 * @param inputStream  the input stream of the socket connection to the server
 	 * @return the file contents if it found the file null otherwise
 	 */
-	private String retrieveFile(String serverAlias, String filename, ObjectOutputStream outputStream,
+	private String retrieveShare(String serverAlias, String filename, ObjectOutputStream outputStream,
 			ObjectInputStream inputStream) {
 		Packet p = new Packet(name, filename, PacketType.RET_FILE);
 
@@ -231,8 +242,10 @@ public class Peer {
 		// add message
 		// encrypt
 		// send to all servers
+		String filename = alias + ".conversation";
+		HashMap<Integer, byte[]> parts = new HashMap<Integer, byte[]>();
 
-		String encData = null;
+//		String encData = null;
 		for (int i = 0; i < servers.length; i++) {
 			SSLSocket currentServer = servers[i];
 
@@ -249,8 +262,13 @@ public class Peer {
 				outputStreams.add(out);
 				inputStreams.add(in);
 
-				if ((encData = retrieveFile(serverAlias, alias + ".conversation", out, in)) != null) {
-					break;
+				// base64 enc share
+				String base64Share = retrieveShare(serverAlias, filename, out, in);
+
+				// add share
+				if (base64Share != null) {
+					byte[] share = Base64.getDecoder().decode(base64Share);
+					parts.put(i, share);
 				}
 
 			} catch (IOException e) {
@@ -259,9 +277,16 @@ public class Peer {
 			}
 		}
 
-		File conversationFile;
-
-		if (encData == null) {
+		File conversationFile = null;
+		boolean canRebuildFile =parts.size() < SHARE_THRESHOLD;
+		// returns the recoverd file bytes
+		byte[] recovered = scheme.join(parts);
+		// key+@+filebytes
+		String encData = Base64.getEncoder().encodeToString(recovered);
+		System.out.println("=======\nAfter share join: " + encData + "=======\n");
+		
+		
+		if (!canRebuildFile) {
 			// criar file
 			// System.out.println("Creating new .conversation file");
 			conversationFile = new File("conversations/" + alias + ".conversation");
@@ -289,6 +314,7 @@ public class Peer {
 		// System.out.println("Encrypting updated file...");
 		String encFile = null;
 		try {
+			// key+@+bytes
 			encFile = HybridEncryption.encryptFile(conversationFile, trustStore.getCertificate(name).getPublicKey());
 		} catch (KeyStoreException e) {
 			System.out.println("Could not retrieve public key");
@@ -300,6 +326,8 @@ public class Peer {
 			return;
 		}
 
+		Map<Integer, byte[]> shares = scheme.split(encFile.getBytes());
+		
 		// System.out.println("Sending file to backup servers...");
 		int successfullBackups = 0;
 		for (int i = 0; i < servers.length; i++) {
@@ -312,6 +340,9 @@ public class Peer {
 			// System.out.println("Sending file to server (" + i + ") " + serverAlias);
 			ObjectOutputStream out = outputStreams.get(i);
 			ObjectInputStream in = inputStreams.get(i);
+			
+			String encData = Base64.getEncoder().encodeToString(shares.get(i));
+			
 			EncryptedPacket encFilePacket = encryptPacket(serverAlias, alias + ".conversation " + encFile,
 					PacketType.BACKUP);
 
@@ -534,10 +565,10 @@ public class Peer {
 					continue;
 				}
 
-				if(p.get_data().equals("")) {
-					continue;//no files available
+				if (p.get_data().equals("")) {
+					continue;// no files available
 				}
-				
+
 				System.out.println("Adding file names");
 				String[] files = p.get_data().split(" ");
 				List<String> fileList = Arrays.asList(files);
@@ -571,39 +602,81 @@ public class Peer {
 
 	private void retrieveAvailableFiles(HashSet<String> filesInServers, HashMap<String, List<String>> filesPerServer,
 			List<ObjectOutputStream> outputStreams, List<ObjectInputStream> inputStreams, SSLSocket[] servers) {
-		
+
+		HashMap<String, HashMap<Integer, byte[]>> fileShares = new HashMap<String, HashMap<Integer, byte[]>>();
+
 		for (Map.Entry<String, List<String>> entry : filesPerServer.entrySet()) {
 			String serverAlias = entry.getKey();
 			List<String> availableFiles = entry.getValue();
-			
-			
-			
+
 			for (String filename : availableFiles) {
-				if(filesInServers.contains(filename)) {
-					
+				if (filesInServers.contains(filename)) {
+
 					int streamIndex = retrieveServerAliasIndex(serverAlias);
-					
-					if(servers[streamIndex] == null) {
-						continue;//server is not available
+
+					if (servers[streamIndex] == null) {
+						continue;// server is not available
 					}
-					
-					String encData = retrieveFile(serverAlias, filename, outputStreams.get(streamIndex), inputStreams.get(streamIndex));
-					
-					try {
-						//TODO: verify if decryptFile writes file to mem
-						File conversationFile = HybridEncryption.decryptFile(filename, encData,
-								(PrivateKey) keyStore.getKey(name, password.toCharArray()));
-						
-						if(conversationFile != null) {
-							//last operation
-							filesInServers.remove(filename);							
+
+					String encData = retrieveShare(serverAlias, filename, outputStreams.get(streamIndex),
+							inputStreams.get(streamIndex));
+
+					// is first share
+					if (!fileShares.containsKey(filename)) {
+						HashMap<Integer, byte[]> shares = new HashMap<Integer, byte[]>();
+
+						// decode share from base64
+						byte[] share = Base64.getDecoder().decode(encData);
+						// add share to new map
+						shares.put(streamIndex, share);
+						fileShares.put(filename, shares);
+					} else {
+						HashMap<Integer, byte[]> shares = fileShares.get(filename);
+
+						if (shares != null) {
+							byte[] share = Base64.getDecoder().decode(encData);
+							shares.put(streamIndex, share);
+						} else {
+							System.out.println("Error");
+							System.exit(-1);
 						}
-					} catch (UnrecoverableKeyException | KeyStoreException | NoSuchAlgorithmException e) {
-						e.printStackTrace();
+					}
+
+					if (coudlRebuildFile(filename, fileShares.get(filename), null)) {
+						filesInServers.remove(filename);
 					}
 				}
 			}
 		}
+	}
+
+	private boolean coudlRebuildFile(String filename, HashMap<Integer, byte[]> shares, File returnFile) {
+
+		if (shares.size() < SHARE_THRESHOLD) {
+			return false;
+		}
+		// returns the recoverd file bytes
+		byte[] recovered = scheme.join(shares);
+		// key+@+filebytes
+		String encData = Base64.getEncoder().encodeToString(recovered);
+
+		System.out.println("=======\nAfter share join: " + encData + "=======\n");
+
+		try {
+			// TODO: verify if decryptFile writes file to mem
+			returnFile = HybridEncryption.decryptFile(filename, encData,
+					(PrivateKey) keyStore.getKey(name, password.toCharArray()));
+
+			if (returnFile != null) {
+				// last operation
+				return true;
+			}
+		} catch (UnrecoverableKeyException | KeyStoreException | NoSuchAlgorithmException e) {
+			e.printStackTrace();
+			return false;
+		}
+
+		return false;
 	}
 
 	private void checkForConversationsInServers() {
@@ -615,12 +688,12 @@ public class Peer {
 		SSLSocket[] servers = connectToBackupServer();
 
 		getAvailableFiles(filesInServers, filesPerServer, outputStreams, inputStreams, servers);
-		retrieveAvailableFiles(filesInServers, filesPerServer, outputStreams, inputStreams, servers);
-		
+//		retrieveAvailableFiles(filesInServers, filesPerServer, outputStreams, inputStreams, servers);
+
 		for (int i = 0; i < servers.length; i++) {
 			try {
-				if(servers[i] != null) {
-					servers[i].close();					
+				if (servers[i] != null) {
+					servers[i].close();
 				}
 			} catch (IOException e) {
 				e.printStackTrace();
@@ -756,7 +829,7 @@ public class Peer {
 
 		// Start the thread that accepts connections
 		connectionAcceptorThread.start();
-		//try retrieve any available files in the servers on startup
+		// try retrieve any available files in the servers on startup
 		checkForConversationsInServers();
 	}
 
