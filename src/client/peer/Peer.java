@@ -135,8 +135,7 @@ public class Peer {
 	private String joinShares(Map<Integer, byte[]> parts) {
 		byte[] byteSecret = scheme.join(parts);
 
-		byte[] b64Secret = Base64.getDecoder().decode(byteSecret);
-		return new String(b64Secret);
+		return new String(byteSecret);
 	}
 
 	private Map<Integer, byte[]> splitSecret(String secret) {
@@ -275,10 +274,10 @@ public class Peer {
 				// add share
 				if (base64Share != null) {
 //					System.out.println("Share retrieved successfully decoding...");
-					System.out.printf("Server %d b64share= " + base64Share + "\n", serverAlias);
+//					System.out.printf("Server %d b64share= " + base64Share + "\n", serverAlias);
 					byte[] share = Base64.getDecoder().decode(base64Share);
 //					System.out.println("Adding share...");
-					parts.put(i, share);
+					parts.put(i+1, share);
 				}
 
 			} catch (IOException e) {
@@ -319,24 +318,25 @@ public class Peer {
 		}
 
 //		System.out.println("Encrypting updated file...");
-		String encFile = null;
+		String secret = null;
 		try {
 			// returns wrapped key + @ + file bytes
-			encFile = HybridEncryption.encryptFile(conversationFile, trustStore.getCertificate(name).getPublicKey());
+			secret = HybridEncryption.encryptFile(conversationFile, trustStore.getCertificate(name).getPublicKey());
 		} catch (KeyStoreException e) {
 			System.out.println("Could not retrieve public key");
 			e.printStackTrace();
 		}
 
-		if (encFile == null) {
+		if (secret == null) {
 			System.out.println("Error trying to encrypt file for backup servers");
 			return;
 		}
 
-		System.out.println("\n======ENCFILE= " + encFile + "======\n");
+		System.out.println("\n======ENCFILE= " + secret + "======\n");
 
-		Map<Integer, byte[]> shares = splitSecret(encFile);
+		Map<Integer, byte[]> shares = splitSecret(secret);
 
+		System.out.println(joinShares(shares));
 //		System.out.println("Sending file to backup servers...");
 		int successfullBackups = 0;
 		for (int i = 0; i < servers.length; i++) {
