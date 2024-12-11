@@ -95,6 +95,15 @@ public class MessageReader implements Runnable {
 			response = new Packet("server", fileNames, PacketType.AVAILABLE_FILES);
 			
 			break;
+		case PacketType.SEARCH:
+			System.out.println("Processing search request");
+			String userName = p.get_sender();
+			String searchResults = ServerMaps.search(userName, p.get_data());
+			System.out.println(searchResults);
+			
+			
+			response = new Packet("server", searchResults, PacketType.SEARCH);
+			break;
 		default:
 			System.out.println("Could not process packet. Did not recognize type " + p.get_packet_type().toString());
 			break;
