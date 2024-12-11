@@ -8,6 +8,7 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.ResponseCache;
 import java.net.ServerSocket;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystems;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
@@ -131,6 +132,18 @@ public class Peer {
 		return servers;
 	}
 
+	private String joinShares(Map<Integer, byte[]> parts) {
+		byte[] byteSecret = scheme.join(parts);
+		
+		byte[] b64Secret = Base64.getDecoder().decode(byteSecret);
+		return new String(b64Secret);
+	}
+	
+	private Map<Integer, byte[]> splitSecret(String secret) {
+		System.out.println("Secret="+ secret);
+		return scheme.split(secret.getBytes());
+	}
+	
 	/**
 	 * Tries to retrieve a file from the backup servers
 	 * 
@@ -145,37 +158,38 @@ public class Peer {
 		Packet p = new Packet(name, filename, PacketType.RET_FILE);
 
 		String encData = null;
-//		System.out.println("Searching for existing file in server " + serverAlias);
+		System.out.println("Searching for existing file in server " + serverAlias);
 
 		EncryptedPacket encRequest = encryptPacket(serverAlias, p);
 
 		try {
 
-//			System.out.println("Sending file request");
+			System.out.println("Sending share request");
 			outputStream.writeObject(encRequest);
 
-//			System.out.println("Waiting for server response...");
+			System.out.println("Waiting for server response...");
 			EncryptedPacket encResponse = (EncryptedPacket) inputStream.readObject();
 
 			if (encResponse.getEncryptedData() == null || encResponse.getEncryptedAESKey() == null
 					|| encResponse.getIv() == null) {
 
 				// server could not decode message
-//				System.out.println("Server could not decode message from client");
+				System.out.println("Server could not decode message from client");
 				return null;
 			}
 
 			Packet response = tryReadMessage(encResponse);
 
-//			System.out.println("Server response detected. Reading response...");
+			System.out.println("Server response detected. Reading response...");
 
 			if (response == null) {
-//				System.out.println("Error while trying to read response from server");
+				System.out.println("Error while trying to read response from server");
 				return null;
 			}
 
 			if ((encData = response.get_data()) != null) {
-//				System.out.println("Server has backup file. Skipping other servers...");
+//				System.out.println("Server has share");
+//				System.out.println("\n\nRetrived share = " + encData);
 				return encData;
 			}
 
@@ -188,7 +202,7 @@ public class Peer {
 			System.out.println("Could not cast to EncryptedPacket. Class not found");
 		}
 
-		return encData;
+		return null;
 	}
 
 	private boolean sendFileToServer(String serverAlias, EncryptedPacket packet, ObjectOutputStream outputStream,
@@ -197,9 +211,7 @@ public class Peer {
 		try {
 			outputStream.writeObject(packet);
 
-			// TODO receive ACK
 			EncryptedPacket encResponse = (EncryptedPacket) inputStream.readObject();
-
 			Packet response = tryReadMessage(encResponse);
 
 			if (response == null) {
@@ -238,8 +250,8 @@ public class Peer {
 
 		String filename = alias + ".conversation";
 		HashMap<Integer, byte[]> parts = new HashMap<Integer, byte[]>();
-		
-		//loop to retrive available shares
+
+		// loop to retrive available shares
 		for (int i = 0; i < servers.length; i++) {
 			SSLSocket currentServer = servers[i];
 
@@ -252,16 +264,19 @@ public class Peer {
 				ObjectOutputStream out = new ObjectOutputStream(currentServer.getOutputStream());
 				ObjectInputStream in = new ObjectInputStream(currentServer.getInputStream());
 
-				// System.out.println("Saving server socket streams");
 				outputStreams.add(out);
 				inputStreams.add(in);
 
+//				System.out.println("Trying to retrieve share");
 				// base64 enc share
 				String base64Share = retrieveShare(serverAlias, filename, out, in);
 
+//					System.out.printf("Retrieved share (%s)= %s",serverAlias,  base64Share);
 				// add share
 				if (base64Share != null) {
+//					System.out.println("Share retrieved successfully decoding...");
 					byte[] share = Base64.getDecoder().decode(base64Share);
+//					System.out.println("Adding share...");
 					parts.put(i, share);
 				}
 
@@ -273,16 +288,15 @@ public class Peer {
 
 		File conversationFile = null;
 		boolean cannotRebuildFile = parts.size() < SHARE_THRESHOLD;
-		
-		//doesnt have enough shares
+
+		// doesnt have enough shares
 		if (cannotRebuildFile) {
 			// criar file
 			// System.out.println("Creating new .conversation file");
+//			System.out.println("No file found or not enough shares. Creating new file...");
 			conversationFile = new File("conversations/" + alias + ".conversation");
 		} else {
-			byte[] recovered = scheme.join(parts);
-			// key+@+filebytes
-			String encData = Base64.getEncoder().encodeToString(recovered);
+			String encData = joinShares(parts);
 			System.out.println("=======\nAfter share join: " + encData + "=======\n");
 			// decrypt file
 			try {
@@ -294,7 +308,7 @@ public class Peer {
 			}
 		}
 
-		// System.out.println("Writing new message...");
+//		System.out.println("Writing new message...");
 		try (BufferedWriter writer = new BufferedWriter(new FileWriter(conversationFile, true))) {
 			// add message
 			writer.write(msg);
@@ -303,10 +317,10 @@ public class Peer {
 			System.err.println("An error occurred while writing the message to the file: " + e.getMessage());
 		}
 
-		// System.out.println("Encrypting updated file...");
+//		System.out.println("Encrypting updated file...");
 		String encFile = null;
 		try {
-			// key+@+bytes
+			// returns wrapped key + @ + file bytes
 			encFile = HybridEncryption.encryptFile(conversationFile, trustStore.getCertificate(name).getPublicKey());
 		} catch (KeyStoreException e) {
 			System.out.println("Could not retrieve public key");
@@ -318,9 +332,11 @@ public class Peer {
 			return;
 		}
 
-		Map<Integer, byte[]> shares = scheme.split(encFile.getBytes());
+		System.out.println("\n======ENCFILE= "+ encFile+"======\n");
 		
-		// System.out.println("Sending file to backup servers...");
+		Map<Integer, byte[]> shares = splitSecret(encFile);
+
+//		System.out.println("Sending file to backup servers...");
 		int successfullBackups = 0;
 		for (int i = 0; i < servers.length; i++) {
 			if (servers[i] == null) {
@@ -329,19 +345,20 @@ public class Peer {
 
 			String serverAlias = serverAliases.get(i);
 			// send file
-			// System.out.println("Sending file to server (" + i + ") " + serverAlias);
+//			System.out.println("Sending share to server (" + i + ") " + serverAlias);
 			ObjectOutputStream out = outputStreams.get(i);
 			ObjectInputStream in = inputStreams.get(i);
-			
-			String encData = Base64.getEncoder().encodeToString(shares.get(i));
-			
-			EncryptedPacket encFilePacket = encryptPacket(serverAlias, alias + ".conversation " + encFile,
+
+			String encData = Base64.getEncoder().encodeToString(shares.get(i + 1));
+
+			if(i == 0)
+				System.out.println("Base64 encoded share=" + encData);
+
+			EncryptedPacket encFilePacket = encryptPacket(serverAlias, alias + ".conversation " + encData,
 					PacketType.BACKUP);
 
 			if (sendFileToServer(serverAlias, encFilePacket, out, in)) {
 				successfullBackups++;
-				// System.out.println("File backup successful. Servers[" + successfullBackups +
-				// "/3]");
 			}
 
 			try {
@@ -350,6 +367,7 @@ public class Peer {
 				System.out.println("Error closing connection to backup server " + i);
 			}
 		}
+		System.out.println("File backup successful. Servers[" + successfullBackups + "/3]");
 	}
 
 	public void try_send_message(Scanner sc, String alias) {
@@ -680,7 +698,7 @@ public class Peer {
 		SSLSocket[] servers = connectToBackupServer();
 
 		getAvailableFiles(filesInServers, filesPerServer, outputStreams, inputStreams, servers);
-//		retrieveAvailableFiles(filesInServers, filesPerServer, outputStreams, inputStreams, servers);
+		retrieveAvailableFiles(filesInServers, filesPerServer, outputStreams, inputStreams, servers);
 
 		for (int i = 0; i < servers.length; i++) {
 			try {
@@ -720,38 +738,39 @@ public class Peer {
 			System.out.println("Searching locally");
 			searchLocal(keywords);
 		} else {
-			
+
 			// hash keyword
 			String hash = createLabel(keywords);
-			
+
 			if (hash == null) {
 				return;
 			}
-			
+
 			// we assume that the first available server has an up to date table
 			// send to server
 			int i = 0;
 			SSLSocket currentServer = null;
-			for (;i < servers.length; i++) { // this is so scuffed
+			for (; i < servers.length; i++) { // this is so scuffed
 				currentServer = servers[i];
 				if (currentServer != null) {
 					break;
 				}
 			}
-			
-			if (currentServer == null) { // if we're in the remote search part of the function this shouldnt happen but just in case
+
+			if (currentServer == null) { // if we're in the remote search part of the function this shouldnt happen but
+											// just in case
 				System.err.println("Error with connecting to server");
 				return;
 			}
-			
+
 			String serverAlias = serverAliases.get(i);
 			try {
 				ObjectOutputStream out = new ObjectOutputStream(currentServer.getOutputStream());
 				ObjectInputStream in = new ObjectInputStream(currentServer.getInputStream());
-				
+
 				EncryptedPacket labelPacket = encryptPacket(serverAlias, hash, PacketType.SEARCH);
 				out.writeObject(labelPacket);
-				
+
 				// receive reply
 				EncryptedPacket encResponse = (EncryptedPacket) in.readObject();
 
@@ -762,23 +781,22 @@ public class Peer {
 				}
 
 				Packet response = tryReadMessage(encResponse);
-				
+
 				if (response == null) {
 					System.err.println("Something went wrong. Try again.");
 					return;
 				}
-		
+
 				System.out.println(response.get_data()); // made it so the server sends it in an orderly fashion
-			
-			} catch (IOException e ) {
+
+			} catch (IOException e) {
 				System.err.println("Error with streams");
 			} catch (ClassNotFoundException e) {
 				System.err.println("Error with classes. Class not found.");
-			}	
+			}
 		}
 	}
-	
-	
+
 	// this is the type of function that should probably be somewhere else but
 	// i currently just want to write something that works
 	// also im unsure as to whether we can hash keywords instead of encrypting them
@@ -786,13 +804,13 @@ public class Peer {
 		byte[] hash = null;
 		try {
 			MessageDigest digest = MessageDigest.getInstance("SHA-256");
-	        hash = digest.digest(keywords.getBytes("UTF-8"));
+			hash = digest.digest(keywords.getBytes("UTF-8"));
 		} catch (Exception e) {
 			System.err.println("Error during label creation. Please try again.");
 		}
-        return Base64.getEncoder().encodeToString(hash);
+		return Base64.getEncoder().encodeToString(hash);
 	}
-	
+
 	private boolean backupServersDown(SSLSocket[] backups) {
 		return backups == null || Arrays.stream(backups).allMatch(e -> e == null); // might be unnecessary considering
 																					// it's 1 line

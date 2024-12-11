@@ -3,6 +3,7 @@ package client.peer;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -18,20 +19,35 @@ public class Test {
 	
 	private static void doIt() {
 	    final ShamirScheme scheme = new ShamirScheme(new SecureRandom(), 5, 3);
-	    final byte[] secret = "hello there".getBytes(StandardCharsets.UTF_8);
+	    String msg = "ola";
+	    byte[] encryptedMsg = msg.getBytes();
+	    // equivalent to encFile
+	    String b64Msg = Base64.getEncoder().encodeToString(encryptedMsg);
+	    
+	    final byte[] secret = b64Msg.getBytes(); 
 	    final Map<Integer, byte[]> parts = scheme.split(secret);
 	    
-	    
+	    HashMap<Integer, String> b64Parts = new HashMap<Integer, String>();
+	    //b64 encode parts
+	    for (Map.Entry<Integer, byte[]> entry : parts.entrySet()) {
+			Integer key = entry.getKey();
+			byte[] val = entry.getValue();
+			
+			b64Parts.put(key, Base64.getEncoder().encodeToString(val));
+		}
+	    //send to server
+	    //retrieve from server
 	    Map<Integer, byte[]> partialParts = new HashMap<Integer, byte[]>();
 	    
-	    partialParts.put(1, parts.get(1));
-	    partialParts.put(2, parts.get(2));
-//	    partialParts.put(4, parts.get(4));
-	    
-	    System.out.println(parts.toString());
-	    System.out.println(partialParts.toString());
+	    for (Map.Entry<Integer, String> entry : b64Parts.entrySet()) {
+			Integer key = entry.getKey();
+			String val = entry.getValue();
+			
+			partialParts.put(key, Base64.getDecoder().decode(val));
+		}
 	    
 	    final byte[] recovered = scheme.join(partialParts);
-	    System.out.println(new String(recovered, StandardCharsets.UTF_8));
+	    final byte[] recoveredB64 = Base64.getDecoder().decode(recovered);
+	    System.out.println(new String(recoveredB64));
 	  } 
 }

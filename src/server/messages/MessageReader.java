@@ -80,6 +80,8 @@ public class MessageReader implements Runnable {
 			String filename = args[0];
 			String contents = args[1];
 			
+			System.out.println("File backup contents=" + contents);
+			
 			if(ServerFiles.backup(p.get_sender(), filename, contents)) {
 				response = new Packet("server", "", PacketType.ACK);
 			}
