@@ -134,16 +134,16 @@ public class Peer {
 
 	private String joinShares(Map<Integer, byte[]> parts) {
 		byte[] byteSecret = scheme.join(parts);
-		
+
 		byte[] b64Secret = Base64.getDecoder().decode(byteSecret);
 		return new String(b64Secret);
 	}
-	
+
 	private Map<Integer, byte[]> splitSecret(String secret) {
-		System.out.println("Secret="+ secret);
+		System.out.println("Secret=" + secret);
 		return scheme.split(secret.getBytes());
 	}
-	
+
 	/**
 	 * Tries to retrieve a file from the backup servers
 	 * 
@@ -275,6 +275,7 @@ public class Peer {
 				// add share
 				if (base64Share != null) {
 //					System.out.println("Share retrieved successfully decoding...");
+					System.out.printf("Server %d b64share= " + base64Share + "\n", serverAlias);
 					byte[] share = Base64.getDecoder().decode(base64Share);
 //					System.out.println("Adding share...");
 					parts.put(i, share);
@@ -332,8 +333,8 @@ public class Peer {
 			return;
 		}
 
-		System.out.println("\n======ENCFILE= "+ encFile+"======\n");
-		
+		System.out.println("\n======ENCFILE= " + encFile + "======\n");
+
 		Map<Integer, byte[]> shares = splitSecret(encFile);
 
 //		System.out.println("Sending file to backup servers...");
@@ -351,7 +352,7 @@ public class Peer {
 
 			String encData = Base64.getEncoder().encodeToString(shares.get(i + 1));
 
-			if(i == 0)
+			if (i == 0)
 				System.out.println("Base64 encoded share=" + encData);
 
 			EncryptedPacket encFilePacket = encryptPacket(serverAlias, alias + ".conversation " + encData,
@@ -598,79 +599,82 @@ public class Peer {
 		}
 	}
 
-	private int retrieveServerAliasIndex(String serverAlias) {
-		for (Map.Entry<Integer, String> entry : serverAliases.entrySet()) {
-			Integer key = entry.getKey();
-			String val = entry.getValue();
-
-			if (val.equals(serverAlias))
-				return key;
-		}
-
-		return -1;
-	}
-
-	private void retrieveAvailableFiles(HashSet<String> filesInServers, HashMap<String, List<String>> filesPerServer,
+	private void retrieveAvailableFiles(HashMap<String, List<String>> filesPerServer,
 			List<ObjectOutputStream> outputStreams, List<ObjectInputStream> inputStreams, SSLSocket[] servers) {
 
-		HashMap<String, HashMap<Integer, byte[]>> fileShares = new HashMap<String, HashMap<Integer, byte[]>>();
+		HashMap<String, HashMap<Integer, byte[]>> filesShares = new HashMap<String, HashMap<Integer, byte[]>>();
 
-		for (Map.Entry<String, List<String>> entry : filesPerServer.entrySet()) {
-			String serverAlias = entry.getKey();
-			List<String> availableFiles = entry.getValue();
+		//iterate through all servers
+		for (int i = 0; i < servers.length; i++) {
+			if (servers[i] == null) {
+				continue;
+			}
 
-			for (String filename : availableFiles) {
-				if (filesInServers.contains(filename)) {
+			ObjectOutputStream out = outputStreams.get(i);
+			ObjectInputStream in = inputStreams.get(i);
+			String serverAlias = serverAliases.get(i);
 
-					int streamIndex = retrieveServerAliasIndex(serverAlias);
+			List<String> filenames = filesPerServer.get(serverAlias);
 
-					if (servers[streamIndex] == null) {
-						continue;// server is not available
+			//iterate through all files available in the server			
+			for (String filename : filenames) {
+				String encShare = retrieveShare(serverAlias, filename, out, in);
+
+				if (encShare == null) {
+					continue;
+				}
+				
+				System.out.println("New share retrieved");
+				
+				//get each share
+				byte[] shareB64 = Base64.getDecoder().decode(encShare.getBytes());
+
+				if (filesShares.containsKey(filename)) {
+					HashMap<Integer, byte[]> shares = filesShares.get(filename);
+
+					if (shares == null) {
+						System.out.println("Error");
+						System.exit(-1);
 					}
-
-					String encData = retrieveShare(serverAlias, filename, outputStreams.get(streamIndex),
-							inputStreams.get(streamIndex));
-
-					// is first share
-					if (!fileShares.containsKey(filename)) {
-						HashMap<Integer, byte[]> shares = new HashMap<Integer, byte[]>();
-
-						// decode share from base64
-						byte[] share = Base64.getDecoder().decode(encData);
-						// add share to new map
-						shares.put(streamIndex, share);
-						fileShares.put(filename, shares);
-					} else {
-						HashMap<Integer, byte[]> shares = fileShares.get(filename);
-
-						if (shares != null) {
-							byte[] share = Base64.getDecoder().decode(encData);
-							shares.put(streamIndex, share);
-						} else {
-							System.out.println("Error");
-							System.exit(-1);
-						}
-					}
-
-					if (coudlRebuildFile(filename, fileShares.get(filename), null)) {
-						filesInServers.remove(filename);
-					}
+					
+					shares.put(i+1, shareB64);
+				}else {
+					HashMap<Integer, byte[]> shares = new HashMap<Integer, byte[]>();
+					shares.put(i+1, shareB64);
+					filesShares.put(filename, shares);
 				}
 			}
 		}
+		
+		for (Map.Entry<String, HashMap<Integer, byte[]>> entry : filesShares.entrySet()) {
+			String filename = entry.getKey();
+			HashMap<Integer, byte[]> shares = entry.getValue();
+			File rebuiltFile = null;
+			System.out.println("Trying to rebuil " + filename);
+			if(couldRebuildFile(filename, shares, rebuiltFile))
+				System.out.println("File rebuilt with success");
+			else
+				System.out.println("Could not rebuild file");
+		}
+		
+		System.out.flush();
 	}
 
-	private boolean coudlRebuildFile(String filename, HashMap<Integer, byte[]> shares, File returnFile) {
+	private boolean couldRebuildFile(String filename, HashMap<Integer, byte[]> shares, File returnFile) {
 
+		// Does not have enough shares
 		if (shares.size() < SHARE_THRESHOLD) {
 			return false;
 		}
-		// returns the recoverd file bytes
-		byte[] recovered = scheme.join(shares);
-		// key+@+filebytes
-		String encData = Base64.getEncoder().encodeToString(recovered);
 
-		System.out.println("=======\nAfter share join: " + encData + "=======\n");
+		String encData = joinShares(shares);
+		System.out.println("Recovered encdata = " + encData);
+//		// returns the recoverd file bytes
+//		byte[] recovered = scheme.join(shares);
+//		// key+@+filebytes
+//		byte[] recoveredB64 = Base64.getDecoder().decode(recovered);
+//	    System.out.println(new String(recoveredB64));
+//		String encData = new String(recoveredB64);
 
 		try {
 			// TODO: verify if decryptFile writes file to mem
@@ -698,7 +702,7 @@ public class Peer {
 		SSLSocket[] servers = connectToBackupServer();
 
 		getAvailableFiles(filesInServers, filesPerServer, outputStreams, inputStreams, servers);
-		retrieveAvailableFiles(filesInServers, filesPerServer, outputStreams, inputStreams, servers);
+		retrieveAvailableFiles(filesPerServer, outputStreams, inputStreams, servers);
 
 		for (int i = 0; i < servers.length; i++) {
 			try {

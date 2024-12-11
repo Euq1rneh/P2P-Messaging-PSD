@@ -27,6 +27,8 @@ public class Test {
 	    final byte[] secret = b64Msg.getBytes(); 
 	    final Map<Integer, byte[]> parts = scheme.split(secret);
 	    
+	    System.out.println(parts.toString());
+	    
 	    HashMap<Integer, String> b64Parts = new HashMap<Integer, String>();
 	    //b64 encode parts
 	    for (Map.Entry<Integer, byte[]> entry : parts.entrySet()) {
