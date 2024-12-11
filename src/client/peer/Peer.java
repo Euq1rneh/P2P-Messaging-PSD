@@ -11,6 +11,7 @@ import java.net.ServerSocket;
 import java.nio.file.FileSystems;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
+import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
@@ -714,19 +715,84 @@ public class Peer {
 
 		SSLSocket[] servers = connectToBackupServer();
 
-		// current idea is that if our cloud is down, we search on the local copy which
-		// isnt encrypted
 		System.out.println(backupServersDown(servers));
 		if (backupServersDown(servers)) {
 			System.out.println("Searching locally");
 			searchLocal(keywords);
 		} else {
-			// example function name that would do symmetric searchable encryption in our
-			// cloud's files
-			// searchRemote(keywords);
+			
+			// hash keyword
+			String hash = createLabel(keywords);
+			
+			if (hash == null) {
+				return;
+			}
+			
+			// we assume that the first available server has an up to date table
+			// send to server
+			int i = 0;
+			SSLSocket currentServer = null;
+			for (;i < servers.length; i++) { // this is so scuffed
+				currentServer = servers[i];
+				if (currentServer != null) {
+					break;
+				}
+			}
+			
+			if (currentServer == null) { // if we're in the remote search part of the function this shouldnt happen but just in case
+				System.err.println("Error with connecting to server");
+				return;
+			}
+			
+			String serverAlias = serverAliases.get(i);
+			try {
+				ObjectOutputStream out = new ObjectOutputStream(currentServer.getOutputStream());
+				ObjectInputStream in = new ObjectInputStream(currentServer.getInputStream());
+				
+				EncryptedPacket labelPacket = encryptPacket(serverAlias, hash, PacketType.SEARCH);
+				out.writeObject(labelPacket);
+				
+				// receive reply
+				EncryptedPacket encResponse = (EncryptedPacket) in.readObject();
+
+				if (encResponse.getEncryptedData() == null || encResponse.getEncryptedAESKey() == null
+						|| encResponse.getIv() == null) {
+					System.err.println("Something went wrong. Try again.");
+					return;
+				}
+
+				Packet response = tryReadMessage(encResponse);
+				
+				if (response == null) {
+					System.err.println("Something went wrong. Try again.");
+					return;
+				}
+		
+				System.out.println(response.get_data()); // made it so the server sends it in an orderly fashion
+			
+			} catch (IOException e ) {
+				System.err.println("Error with streams");
+			} catch (ClassNotFoundException e) {
+				System.err.println("Error with classes. Class not found.");
+			}	
 		}
 	}
-
+	
+	
+	// this is the type of function that should probably be somewhere else but
+	// i currently just want to write something that works
+	// also im unsure as to whether we can hash keywords instead of encrypting them
+	private String createLabel(String keywords) {
+		byte[] hash = null;
+		try {
+			MessageDigest digest = MessageDigest.getInstance("SHA-256");
+	        hash = digest.digest(keywords.getBytes("UTF-8"));
+		} catch (Exception e) {
+			System.err.println("Error during label creation. Please try again.");
+		}
+        return Base64.getEncoder().encodeToString(hash);
+	}
+	
 	private boolean backupServersDown(SSLSocket[] backups) {
 		return backups == null || Arrays.stream(backups).allMatch(e -> e == null); // might be unnecessary considering
 																					// it's 1 line
@@ -762,17 +828,12 @@ public class Peer {
 		int count = 0;
 
 		for (String line : lines) {
-			String trimmedLine = line.replaceAll("^[^:]+:", "").trim(); // regex came from gpt, i needed to remove
-																		// usernames
-																		// and colons from the search since that would
-																		// affect
-																		// the search
+			String trimmedLine = line.replaceAll("^[^:]+:", "").trim();
 
-			int index = trimmedLine.indexOf(keywords); // returns -1 when it doesnt find it
+			int index = trimmedLine.indexOf(keywords);
 			while (index >= 0) {
 				count++;
-				index = trimmedLine.indexOf(keywords, index + keywords.length()); // offset makes it move past the last
-																					// found occurrence
+				index = trimmedLine.indexOf(keywords, index + keywords.length());
 			}
 		}
 

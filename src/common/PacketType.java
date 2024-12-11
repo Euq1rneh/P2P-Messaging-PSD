@@ -7,5 +7,6 @@ public enum PacketType {
 	BACKUP, // backup file
 	AVAILABLE_FILES, // check for available files in servers
 	OP_ERROR, // operation error
+	SEARCH, // when searching keywords
 	CLS, // close
 }
