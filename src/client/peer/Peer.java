@@ -66,6 +66,7 @@ public class Peer {
 	private String password;
 
 	private HashMap<Integer, String> serverAliases = new HashMap<Integer, String>();
+	private HashMap<Integer, String> serverAdresses = new HashMap<Integer, String>();
 	KeyManager[] keyManagers;
 	TrustManager[] trustManagers;
 
@@ -81,6 +82,10 @@ public class Peer {
 		serverAliases.put(0, "amazonServer");
 		serverAliases.put(1, "oracleServer");
 		serverAliases.put(2, "googleServer");
+		
+		serverAdresses.put(0, "127.0.0.1:1111");
+		serverAdresses.put(1, "127.0.0.1:2222");
+		serverAdresses.put(2, "127.0.0.1:3333");
 
 		scheme = new ShamirScheme(new SecureRandom(), NUM_SHARES, SHARE_THRESHOLD);
 	}
@@ -115,17 +120,16 @@ public class Peer {
 	}
 
 	private SSLSocket[] connectToBackupServer() {
-		String[] serverAdresses = { "127.0.0.1:1111", "127.0.0.1:2222", "127.0.0.1:3333" };
-		SSLSocket[] servers = new SSLSocket[serverAdresses.length];
+		SSLSocket[] servers = new SSLSocket[serverAdresses.size()];
 
-		for (int i = 0; i < serverAdresses.length; i++) {
-			String[] connectionArgs = serverAdresses[i].split(":");
+		for (int i = 0; i < serverAdresses.size(); i++) {
+			String[] connectionArgs = serverAdresses.get(i).split(":");
 
 			servers[i] = ConnectionManager.try_connect_to_peer(keyStore, trustStore, keyManagers, trustManagers,
 					connectionArgs[0], Integer.parseInt(connectionArgs[1]));
 
 			if (servers[i] == null) {
-				System.out.println("Could not connect to server with address " + serverAdresses[i]);
+				System.out.println("Could not connect to server with address " + connectionArgs[0]+":"+connectionArgs[1]);
 			}
 		}
 
@@ -421,7 +425,7 @@ public class Peer {
 	}
 
 	public EncryptedPacket encryptPacket(String alias, String msg, PacketType type) {
-
+		System.out.println("Encrypting packet for " + alias);
 		try {
 			PublicKey pk = trustStore.getCertificate(alias).getPublicKey();
 
@@ -544,31 +548,36 @@ public class Peer {
 
 		for (int i = 0; i < servers.length; i++) {
 			SSLSocket currentServer = servers[i];
-
+			String serverAlias = serverAliases.get(i);
+			
+			System.out.println("Current server -> " + serverAlias);
 			if (currentServer == null) {
+				System.out.println("could not send message");
+				outputStreams.add(null);
+				inputStreams.add(null);
 				continue; // server connection was not established (might be down for maintenance)
 			}
 
 			try {
-				String serverAlias = serverAliases.get(i);
+				
 				ObjectOutputStream out = new ObjectOutputStream(currentServer.getOutputStream());
 				ObjectInputStream in = new ObjectInputStream(currentServer.getInputStream());
 
 				outputStreams.add(out);
 				inputStreams.add(in);
 				filesPerServer.put(serverAlias, new ArrayList<String>());
-
+				
 				// send files request
 				EncryptedPacket ep = encryptPacket(serverAlias, "", PacketType.AVAILABLE_FILES);
 				if (ep == null) {
 					System.out.println("Error while trying to retrieve " + serverAlias + " key");
 					continue;
 				}
-				System.out.println("Sending available file request to server");
+//				System.out.println("Sending available file request to server");
 				out.writeObject(ep);
 
 				EncryptedPacket encResponse = (EncryptedPacket) in.readObject();
-				System.out.println("Reading response from server");
+//				System.out.println("Reading response from server");
 				Packet p = tryReadMessage(encResponse);
 
 				if (p == null) {
@@ -607,6 +616,8 @@ public class Peer {
 		//iterate through all servers
 		for (int i = 0; i < servers.length; i++) {
 			if (servers[i] == null) {
+				outputStreams.add(null);
+				inputStreams.add(null);
 				continue;
 			}
 
@@ -668,16 +679,8 @@ public class Peer {
 		}
 
 		String encData = joinShares(shares);
-		System.out.println("Recovered encdata = " + encData);
-//		// returns the recoverd file bytes
-//		byte[] recovered = scheme.join(shares);
-//		// key+@+filebytes
-//		byte[] recoveredB64 = Base64.getDecoder().decode(recovered);
-//	    System.out.println(new String(recoveredB64));
-//		String encData = new String(recoveredB64);
 
 		try {
-			// TODO: verify if decryptFile writes file to mem
 			returnFile = HybridEncryption.decryptFile(filename, encData,
 					(PrivateKey) keyStore.getKey(name, password.toCharArray()));
 
