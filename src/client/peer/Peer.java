@@ -550,9 +550,9 @@ public class Peer {
 			SSLSocket currentServer = servers[i];
 			String serverAlias = serverAliases.get(i);
 			
-			System.out.println("Current server -> " + serverAlias);
+//			System.out.println("Current server -> " + serverAlias);
 			if (currentServer == null) {
-				System.out.println("could not send message");
+//				System.out.println("could not send message");
 				outputStreams.add(null);
 				inputStreams.add(null);
 				continue; // server connection was not established (might be down for maintenance)

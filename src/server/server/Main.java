@@ -127,7 +127,6 @@ public class Main {
 	public static void main(String[] args) {
 
 		//alias, port, keystore, password keystore,trust
-		
 		if(args.length != 5) {
 			readConfigFromINI();
 			if(!hasINIFile) {
@@ -135,18 +134,14 @@ public class Main {
 				System.out.println(" <alias> <port> <keystore-path> <keystore-password> <truststore-path>");
 				return;	
 			}
-			
-			System.out.printf("%s | %s | %s | %s | %s\n", username, port, keystorePath, password, truststorePath);
 		}else {
-			String aliasStr = args[0];
+			username = args[0];
 			String portStr = args[1];
 			keystorePath = args[2];
 			password = args[3];
 			truststorePath = args[4];
-			System.out.printf("%s | %s | %s | %s | %s\n", aliasStr, portStr, keystorePath, password, truststorePath);
 			
 			port = Integer.parseInt(portStr);
-			
 		}
 		
 		keyStore = Stores.tryLoadKeystore(keystorePath, password);
@@ -171,7 +166,6 @@ public class Main {
 				e.printStackTrace();
 			}
 		}
-		
 	}
 
 }

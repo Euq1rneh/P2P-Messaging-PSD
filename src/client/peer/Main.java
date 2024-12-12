@@ -270,7 +270,7 @@ public class Main {
 
 		password = "";
 
-//		clearTerminal();
+		clearTerminal();
 		while (running) {
 			peer.list_conversations();
 
