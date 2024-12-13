@@ -236,6 +236,15 @@ public class Peer {
 			return false;
 		}
 	}
+	
+	private String processMSGIntoLabels(String msg) {
+		String[] words = msg.split(" ");
+		StringBuilder sb = new StringBuilder();
+		for (int i = 0; i < words.length; i++) {
+			sb.append(createLabel(words[i]));
+		}
+		return sb.toString();
+	}
 
 	/**
 	 * Tries to send a backup conversation file to a set of servers. This method
@@ -269,6 +278,10 @@ public class Peer {
 
 				outputStreams.add(out);
 				inputStreams.add(in);
+				
+				String data = alias + " " + processMSGIntoLabels(msg);
+				out.writeObject(encryptPacket(serverAlias, data, PacketType.ADD_KEYWORD));
+				in.readObject(); // consume reply
 
 //				System.out.println("Trying to retrieve share");
 				// base64 enc share
@@ -284,9 +297,9 @@ public class Peer {
 					parts.put(i+1, share);
 				}
 
-			} catch (IOException e) {
+			} catch (IOException | ClassNotFoundException e) {
 				System.out.println("Error with streams");
-				e.printStackTrace();
+				e.printStackTrace();;
 			}
 		}
 
