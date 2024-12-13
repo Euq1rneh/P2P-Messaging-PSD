@@ -306,7 +306,8 @@ public class Peer {
 				e.printStackTrace();;
 			}
 		}
-		
+
+		//TODO: maybe keep a local copy of search terms to send to the servers
 		if(downServers > SHARE_THRESHOLD) {
 			System.out.println("Using local backup");
 			MessageLogger.writeMessageLog(msg, filename);
@@ -321,9 +322,6 @@ public class Peer {
 		if (cannotRebuildFile) {
 			//TODO: check if this if is necessary if not declare the variable on line 318 with value and not null
 			conversationFile = new File("conversations/" + alias + ".conversation");
-			System.out.println("======FILE CONTENTS\n");
-			MessageLogger.readMessageLog(filename);
-			System.out.println("======");
 		} else {
 			String encData = joinShares(parts);
 			System.out.println("Rebuilt file...");
@@ -339,13 +337,6 @@ public class Peer {
 
 //		System.out.println("Writing new message...");
 		MessageLogger.writeMessageLog(msg, filename);
-//		try (BufferedWriter writer = new BufferedWriter(new FileWriter(conversationFile, true))) {
-//			// add message
-//			writer.write(msg);
-//			writer.newLine();
-//		} catch (IOException e) {
-//			System.err.println("An error occurred while writing the message to the file: " + e.getMessage());
-//		}
 
 //		System.out.println("Encrypting updated file...");
 		String secret = null;
@@ -361,8 +352,6 @@ public class Peer {
 			System.out.println("Error trying to encrypt file for backup servers");
 			return;
 		}
-
-//		System.out.println("\n======ENCFILE= " + secret + "======\n");
 
 		Map<Integer, byte[]> shares = splitSecret(secret);
 
