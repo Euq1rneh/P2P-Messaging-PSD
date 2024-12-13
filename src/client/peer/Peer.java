@@ -48,8 +48,8 @@ import common.PacketType;
 
 public class Peer {
 
-	private static final int SHARE_THRESHOLD = 3; // ALLOWS FOR AT LEAST ONE TO FAIL (SERVER OR CLIENT)
-	private static final int NUM_SHARES = 4; // CLIENT HOLDS 1 AND EACH SERVER HOLDS 1
+	private static final int SHARE_THRESHOLD = 2; // ALLOWS FOR AT LEAST ONE TO FAIL (SERVER)
+	private static final int NUM_SHARES = 3; // EACH SERVER HOLDS 1
 
 	private String name;
 	private final int in_port;
@@ -67,10 +67,12 @@ public class Peer {
 
 	private HashMap<Integer, String> serverAliases = new HashMap<Integer, String>();
 	private HashMap<Integer, String> serverAdresses = new HashMap<Integer, String>();
-	KeyManager[] keyManagers;
-	TrustManager[] trustManagers;
+	private KeyManager[] keyManagers;
+	private TrustManager[] trustManagers;
 
-	ShamirScheme scheme;
+	private ShamirScheme scheme;
+	
+	private boolean wasUsingLocalBackup = false;
 
 	public Peer(String name, int in_port, KeyStore keyStore, KeyStore trustStore, String password) {
 		this.name = name;
@@ -262,12 +264,13 @@ public class Peer {
 
 		String filename = alias + ".conversation";
 		HashMap<Integer, byte[]> parts = new HashMap<Integer, byte[]>();
-
+		int downServers = 0;
 		// loop to retrive available shares
 		for (int i = 0; i < servers.length; i++) {
 			SSLSocket currentServer = servers[i];
 
 			if (currentServer == null) {
+				downServers++;
 				continue; // server connection was not established (might be down for maintenance)
 			}
 
@@ -279,15 +282,16 @@ public class Peer {
 				outputStreams.add(out);
 				inputStreams.add(in);
 				
+				// Searchable encryption
 				String data = alias + " " + processMSGIntoLabels(msg);
 				out.writeObject(encryptPacket(serverAlias, data, PacketType.ADD_KEYWORD));
 				in.readObject(); // consume reply
 
 //				System.out.println("Trying to retrieve share");
-				// base64 enc share
+				// Secret Sharing
 				String base64Share = retrieveShare(serverAlias, filename, out, in);
 
-//					System.out.printf("Retrieved share (%s)= %s",serverAlias,  base64Share);
+//				System.out.printf("Retrieved share (%s)= %s",serverAlias,  base64Share);
 				// add share
 				if (base64Share != null) {
 //					System.out.println("Share retrieved successfully decoding...");
@@ -302,19 +306,27 @@ public class Peer {
 				e.printStackTrace();;
 			}
 		}
-
+		
+		if(downServers > SHARE_THRESHOLD) {
+			System.out.println("Using local backup");
+			MessageLogger.writeMessageLog(msg, filename);
+			wasUsingLocalBackup = true;
+			return;
+		}
+		
 		File conversationFile = null;
 		boolean cannotRebuildFile = parts.size() < SHARE_THRESHOLD;
 
 		// doesnt have enough shares
 		if (cannotRebuildFile) {
-			// criar file
-			// System.out.println("Creating new .conversation file");
-//			System.out.println("No file found or not enough shares. Creating new file...");
+			//TODO: check if this if is necessary if not declare the variable on line 318 with value and not null
 			conversationFile = new File("conversations/" + alias + ".conversation");
+			System.out.println("======FILE CONTENTS\n");
+			MessageLogger.readMessageLog(filename);
+			System.out.println("======");
 		} else {
 			String encData = joinShares(parts);
-			System.out.println("=======\nAfter share join: " + encData + "=======\n");
+			System.out.println("Rebuilt file...");
 			// decrypt file
 			try {
 				conversationFile = HybridEncryption.decryptFile(alias + ".conversation", encData,
@@ -326,13 +338,14 @@ public class Peer {
 		}
 
 //		System.out.println("Writing new message...");
-		try (BufferedWriter writer = new BufferedWriter(new FileWriter(conversationFile, true))) {
-			// add message
-			writer.write(msg);
-			writer.newLine();
-		} catch (IOException e) {
-			System.err.println("An error occurred while writing the message to the file: " + e.getMessage());
-		}
+		MessageLogger.writeMessageLog(msg, filename);
+//		try (BufferedWriter writer = new BufferedWriter(new FileWriter(conversationFile, true))) {
+//			// add message
+//			writer.write(msg);
+//			writer.newLine();
+//		} catch (IOException e) {
+//			System.err.println("An error occurred while writing the message to the file: " + e.getMessage());
+//		}
 
 //		System.out.println("Encrypting updated file...");
 		String secret = null;
@@ -349,7 +362,7 @@ public class Peer {
 			return;
 		}
 
-		System.out.println("\n======ENCFILE= " + secret + "======\n");
+//		System.out.println("\n======ENCFILE= " + secret + "======\n");
 
 		Map<Integer, byte[]> shares = splitSecret(secret);
 
@@ -368,9 +381,6 @@ public class Peer {
 			ObjectInputStream in = inputStreams.get(i);
 
 			String encData = Base64.getEncoder().encodeToString(shares.get(i + 1));
-
-			if (i == 0)
-				System.out.println("Base64 encoded share=" + encData);
 
 			EncryptedPacket encFilePacket = encryptPacket(serverAlias, alias + ".conversation " + encData,
 					PacketType.BACKUP);
@@ -545,7 +555,7 @@ public class Peer {
 			return -1;
 		}
 
-		String conversation = MessageLogger.read_message_log(conversations[conversation_id] + ".conversation");
+		String conversation = MessageLogger.readMessageLog(conversations[conversation_id] + ".conversation");
 
 		if (conversation == null) {
 			return -1;
@@ -842,7 +852,7 @@ public class Peer {
 		// somewhere else
 		Boolean found = false;
 		for (String conversation : conversations) {
-			String contents = MessageLogger.read_message_log(conversation + ".conversation");
+			String contents = MessageLogger.readMessageLog(conversation + ".conversation");
 
 			int occurrences = countOccurrences(contents, keywords);
 			if (occurrences == 0) {
@@ -905,7 +915,7 @@ public class Peer {
 	 */
 	public void start(boolean running, KeyStore keyStore, String password) {
 
-		MessageLogger.build_conversation_dir();
+		MessageLogger.buildConversationDir();
 		// peer_in = ConnectionManager.peer_server(in_port);
 		peer_in = ConnectionManager.createServerSocket(in_port, keyStore, keyManagers, trustManagers);
 

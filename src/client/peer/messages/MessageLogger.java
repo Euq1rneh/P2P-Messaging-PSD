@@ -13,7 +13,7 @@ public class MessageLogger {
     private static final String CONVERSATION_DIR_PATH = "conversations" + FileSystems.getDefault().getSeparator();
     private static final String CONVERSATION_DIR_NAME = "conversations";
 
-    public static void build_conversation_dir(){
+    public static void buildConversationDir(){
         File dir = new File("." + FileSystems.getDefault().getSeparator() + CONVERSATION_DIR_NAME);
 
         if (!dir.exists()) {
@@ -48,7 +48,7 @@ public class MessageLogger {
      * @param message the message to write
      * @param filename the file where the message should be written
      */
-    public static void write_message_log(String message, String filename) {
+    public static void writeMessageLog(String message, String filename) {
         try (BufferedWriter writer = new BufferedWriter(new FileWriter("." + FileSystems.getDefault().getSeparator() + CONVERSATION_DIR_PATH + filename, true))) {
             writer.write(message);
             writer.newLine();
@@ -62,7 +62,7 @@ public class MessageLogger {
      * Reads the message file
      * @param filename the name of the file (not the full path only the filename)
      */
-    public static String read_message_log(String filename) {
+    public static String readMessageLog(String filename) {
         StringBuilder messageLog = new StringBuilder();
 
         // Use try-with-resources to ensure the file is closed automatically
