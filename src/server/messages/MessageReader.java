@@ -15,10 +15,12 @@ public class MessageReader implements Runnable {
 	private final SSLSocket socket;
 
 	boolean running_status;
+	private ServerMaps serverMaps;
 
-	public MessageReader(SSLSocket socket, boolean running_status) {
+	public MessageReader(SSLSocket socket, boolean running_status, ServerMaps serverMaps) {
 		this.socket = socket;
 		this.running_status = running_status;
+		this.serverMaps = serverMaps;
 	}
 
 	@Override
@@ -100,11 +102,22 @@ public class MessageReader implements Runnable {
 		case PacketType.SEARCH:
 			System.out.println("Processing search request");
 			String userName = p.get_sender();
-			String searchResults = ServerMaps.search(userName, p.get_data());
+			String searchResults = serverMaps.search(userName, p.get_data());
 			System.out.println(searchResults);
 			
 			
 			response = new Packet("server", searchResults, PacketType.SEARCH);
+			break;
+		case PacketType.ADD_KEYWORD:
+			System.out.println("Processing adding keyword");
+			String un = p.get_sender();
+			String[] data = p.get_data().split(" ");
+			
+			for (int i = 1; i < data.length; i++) {
+				serverMaps.addKeyword(un, data[i], data[0]);
+			}
+			
+			response = new Packet("server", "", PacketType.ADD_KEYWORD);
 			break;
 		default:
 			System.out.println("Could not process packet. Did not recognize type " + p.get_packet_type().toString());

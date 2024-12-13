@@ -10,19 +10,17 @@ import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.UnrecoverableKeyException;
 import java.util.Properties;
-import java.util.Scanner;
-
 import javax.net.ssl.KeyManager;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 
-import client.peer.Peer;
 import common.Stores;
 import server.crypto.Encryption;
 import server.messages.MessageReader;
 import server.messages.ServerFiles;
+import server.messages.ServerMaps;
 import server.network.ConnectionManager;
 
 public class Main {
@@ -151,13 +149,15 @@ public class Main {
 		ServerFiles.createDirs();
 		Encryption.setConfig(username, password, keyStore, trustStore);
 		
+		ServerMaps serverMaps = new ServerMaps();
+		
 		serverSocket = ConnectionManager.createServerSocket(port, keyStore, keyManagers, trustManagers);
 		System.out.println("Started backup server");
 		while (!serverSocket.isClosed()) {
 			try {
 				SSLSocket clientSocket = (SSLSocket) serverSocket.accept();
 				System.out.println("New client connection");
-				new Thread(new MessageReader(clientSocket, running)).start();
+				new Thread(new MessageReader(clientSocket, running, serverMaps)).start();
 			} catch (SocketException e) {
 				// this exception hopefully will only be thrown when quiting the program
 				// so there is no need to handle the error

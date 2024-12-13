@@ -8,5 +8,6 @@ public enum PacketType {
 	AVAILABLE_FILES, // check for available files in servers
 	OP_ERROR, // operation error
 	SEARCH, // when searching keywords
+	ADD_KEYWORD, // adding new keywords
 	CLS, // close
 }
