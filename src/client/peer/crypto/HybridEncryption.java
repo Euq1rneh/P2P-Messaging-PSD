@@ -76,9 +76,8 @@ public class HybridEncryption {
 
 			return new Packet(decryptedPacketBytes);
 		} catch (Exception e) {
-			e.printStackTrace();
+			return null;
 		}
-		return null;
 	}
 
 	public static byte[] readFileToByteArray(File file) throws IOException {

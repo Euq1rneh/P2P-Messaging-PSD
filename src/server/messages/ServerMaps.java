@@ -1,44 +1,75 @@
 package server.messages;
 
+import java.nio.ByteBuffer;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+
+import common.ByteArray;
+
 public class ServerMaps {
 	
-	private Map<String, Map<String, List<String>>> userMaps;
+	private static final String hmac_alg = "HmacSHA1";
 	
-	public ServerMaps() {
-		this.userMaps = new ConcurrentHashMap<>();
-	}
+	private Map<ByteArray,ByteArray> index;
+	private Mac hmac;
 	
-	public String search(String user, String keywords) {
-		Map<String, List<String>> userMap = userMaps.get(user);
+	
+	public ServerMaps(HashMap<ByteArray,ByteArray> map) {
+		index = map;
 		
-		List<String> results = userMap.get(keywords);
-		
-		if (results == null || results.isEmpty()) {
-			return "Keyword search yielded no results";
+		//This should not be in the constructor
+		try {
+			hmac = Mac.getInstance(hmac_alg);
+		} catch (NoSuchAlgorithmException e) {
+			e.printStackTrace();
 		}
-		
-		StringBuilder sb = new StringBuilder();
-		for (String result : results) {
-			sb.append("Keyword found in ");
-			sb.append(result);
-			sb.append("\n");
-		}
-		return sb.toString();
 	}
 	
-	public void addKeyword(String username, String keyword, String file) {
-		Map<String, List<String>> searchMap = userMaps.computeIfAbsent(username, k -> new ConcurrentHashMap<>());
-        List<String> fileList = searchMap.computeIfAbsent(keyword, k -> Collections.synchronizedList(new ArrayList<>()));
-        synchronized (fileList) {
-            if (!fileList.contains(file)) {
-                fileList.add(file);
-            }
-        }
+	public void update (ByteArray label, ByteArray value) {
+		index.put(label, value);
+		printIndex();
 	}
+	
+	public List<byte[]> search(byte[] k1) throws InvalidKeyException {
+	    int c = 0;
+	    List<byte[]> encryptedResults = new LinkedList<>();
+
+	    hmac.init(new SecretKeySpec(k1, hmac_alg));
+	    ByteArray value;
+	    do {
+	        byte[] l = hmac.doFinal(ByteBuffer.allocate(4).putInt(c).array());
+	        ByteArray label = new ByteArray(l);
+	        value = index.get(label);
+
+	        if (value != null) {
+	        	System.out.println("Found value corresponding to search term");
+	            encryptedResults.add(value.getArr());
+	            c++;
+	        }
+	    } while (value != null);
+
+	    System.out.println("Returning results");
+	    return encryptedResults;
+	}
+	
+	public void printIndex() {
+	    for (Map.Entry<ByteArray, ByteArray> entry : index.entrySet()) {
+	        System.out.println("Label: " + Base64.getEncoder().encodeToString(entry.getKey().getArr()) +
+	                           ", Encrypted Filename: " +
+	                           Base64.getEncoder().encodeToString(entry.getValue().getArr()));
+	    }
+	}
+
+
 }

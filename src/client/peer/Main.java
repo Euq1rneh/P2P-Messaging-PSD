@@ -3,10 +3,17 @@ package client.peer;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.security.InvalidAlgorithmParameterException;
+import java.security.InvalidKeyException;
 import java.security.KeyStore;
+import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.Properties;
 import java.util.Scanner;
+
+import javax.crypto.BadPaddingException;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.NoSuchPaddingException;
 
 import common.Stores;
 
@@ -325,7 +332,13 @@ public class Main {
 					System.out.println("Missing arguments for search command: :s <keyword(s)>");
 					continue;
 				}
-				peer.searchInConversations(String.join(" ", Arrays.copyOfRange(command_args, 1, command_args.length)));
+				try {
+					peer.searchInConversations(command_args[1]);
+				} catch (InvalidKeyException | NoSuchAlgorithmException | NoSuchPaddingException
+						| InvalidAlgorithmParameterException | IllegalBlockSizeException | BadPaddingException e) {
+					System.out.println("Error while trying to search for the term " + command_args[1]);
+					e.printStackTrace();
+				}
 			
 			} else if (command.equals("")) {
 				// functions as an update to the terminal

@@ -1,15 +1,17 @@
 package client.peer;
 
-import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileWriter;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.net.ResponseCache;
 import java.net.ServerSocket;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.FileSystems;
+import java.nio.ByteBuffer;
+
+import java.security.InvalidAlgorithmParameterException;
+import java.security.InvalidKeyException;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.MessageDigest;
@@ -18,25 +20,31 @@ import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.SecureRandom;
 import java.security.UnrecoverableKeyException;
+import java.security.cert.CertificateException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Scanner;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
+import javax.crypto.BadPaddingException;
+import javax.crypto.Cipher;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.KeyGenerator;
+import javax.crypto.Mac;
+import javax.crypto.NoSuchPaddingException;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
 import javax.net.ssl.KeyManager;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLSocket;
-import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
-
 import client.peer.crypto.HybridEncryption;
 import client.peer.crypto.ShamirScheme;
 import client.peer.messages.MessageLogger;
@@ -50,6 +58,9 @@ public class Peer {
 
 	private static final int SHARE_THRESHOLD = 2; // ALLOWS FOR AT LEAST ONE TO FAIL (SERVER)
 	private static final int NUM_SHARES = 3; // EACH SERVER HOLDS 1
+
+	private static final String HMAC_ALG = "HmacSHA1";
+	private static final String CIPHER_ALG = "AES";
 
 	private String name;
 	private final int in_port;
@@ -71,8 +82,13 @@ public class Peer {
 	private TrustManager[] trustManagers;
 
 	private ShamirScheme scheme;
-	
-	private boolean wasUsingLocalBackup = false;
+
+	private SecretKey masterKey;
+	private HashMap<String, Integer> counters = new HashMap<String, Integer>(100);
+	private SecretKeySpec sk;
+	private IvParameterSpec iv;
+	private Mac hmac;
+	private Cipher aes;
 
 	public Peer(String name, int in_port, KeyStore keyStore, KeyStore trustStore, String password) {
 		this.name = name;
@@ -84,12 +100,19 @@ public class Peer {
 		serverAliases.put(0, "amazonServer");
 		serverAliases.put(1, "oracleServer");
 		serverAliases.put(2, "googleServer");
-		
+
 		serverAdresses.put(0, "127.0.0.1:1111");
 		serverAdresses.put(1, "127.0.0.1:2222");
 		serverAdresses.put(2, "127.0.0.1:3333");
 
 		scheme = new ShamirScheme(new SecureRandom(), NUM_SHARES, SHARE_THRESHOLD);
+		try {
+			hmac = Mac.getInstance(HMAC_ALG);
+			aes = Cipher.getInstance("AES/CBC/PKCS5Padding");
+		} catch (NoSuchAlgorithmException | NoSuchPaddingException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 	}
 
 	/**
@@ -131,7 +154,8 @@ public class Peer {
 					connectionArgs[0], Integer.parseInt(connectionArgs[1]));
 
 			if (servers[i] == null) {
-				System.out.println("Could not connect to server with address " + connectionArgs[0]+":"+connectionArgs[1]);
+				System.out.println(
+						"Could not connect to server with address " + connectionArgs[0] + ":" + connectionArgs[1]);
 			}
 		}
 
@@ -145,7 +169,7 @@ public class Peer {
 	}
 
 	private Map<Integer, byte[]> splitSecret(String secret) {
-		System.out.println("Secret=" + secret);
+//		System.out.println("Secret=" + secret);
 		return scheme.split(secret.getBytes());
 	}
 
@@ -238,7 +262,7 @@ public class Peer {
 			return false;
 		}
 	}
-	
+
 	private String processMSGIntoLabels(String msg) {
 		String[] words = msg.split(" ");
 		StringBuilder sb = new StringBuilder();
@@ -265,6 +289,24 @@ public class Peer {
 		String filename = alias + ".conversation";
 		HashMap<Integer, byte[]> parts = new HashMap<Integer, byte[]>();
 		int downServers = 0;
+
+		// Searchable encryption
+		String[] terms = msg.substring(msg.indexOf(":") + 1).split(" ");
+		for (String word : terms) {
+			if (word.equals(":") || word.equals(" ")) {
+				continue;
+			}
+
+			try {
+				System.out.println("Updating search with term: " + word);
+				updateSearchTerms(word, filename);
+			} catch (InvalidKeyException | NoSuchAlgorithmException | NoSuchPaddingException
+					| InvalidAlgorithmParameterException | IllegalBlockSizeException | BadPaddingException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
+
 		// loop to retrive available shares
 		for (int i = 0; i < servers.length; i++) {
 			SSLSocket currentServer = servers[i];
@@ -281,11 +323,6 @@ public class Peer {
 
 				outputStreams.add(out);
 				inputStreams.add(in);
-				
-				// Searchable encryption
-				String data = alias + " " + processMSGIntoLabels(msg);
-				out.writeObject(encryptPacket(serverAlias, data, PacketType.ADD_KEYWORD));
-				in.readObject(); // consume reply
 
 //				System.out.println("Trying to retrieve share");
 				// Secret Sharing
@@ -298,29 +335,30 @@ public class Peer {
 //					System.out.printf("Server %d b64share= " + base64Share + "\n", serverAlias);
 					byte[] share = Base64.getDecoder().decode(base64Share);
 //					System.out.println("Adding share...");
-					parts.put(i+1, share);
+					parts.put(i + 1, share);
 				}
 
-			} catch (IOException | ClassNotFoundException e) {
+			} catch (IOException e) {
 				System.out.println("Error with streams");
-				e.printStackTrace();;
+				e.printStackTrace();
+				;
 			}
 		}
 
-		//TODO: maybe keep a local copy of search terms to send to the servers
-		if(downServers > SHARE_THRESHOLD) {
+		// TODO: maybe keep a local copy of search terms to send to the servers
+		if (downServers > SHARE_THRESHOLD) {
 			System.out.println("Using local backup");
 			MessageLogger.writeMessageLog(msg, filename);
-			wasUsingLocalBackup = true;
 			return;
 		}
-		
+
 		File conversationFile = null;
 		boolean cannotRebuildFile = parts.size() < SHARE_THRESHOLD;
 
 		// doesnt have enough shares
 		if (cannotRebuildFile) {
-			//TODO: check if this if is necessary if not declare the variable on line 318 with value and not null
+			// TODO: check if this if is necessary if not declare the variable on line 318
+			// with value and not null
 			conversationFile = new File("conversations/" + alias + ".conversation");
 		} else {
 			String encData = joinShares(parts);
@@ -561,7 +599,7 @@ public class Peer {
 		for (int i = 0; i < servers.length; i++) {
 			SSLSocket currentServer = servers[i];
 			String serverAlias = serverAliases.get(i);
-			
+
 //			System.out.println("Current server -> " + serverAlias);
 			if (currentServer == null) {
 //				System.out.println("could not send message");
@@ -571,14 +609,14 @@ public class Peer {
 			}
 
 			try {
-				
+
 				ObjectOutputStream out = new ObjectOutputStream(currentServer.getOutputStream());
 				ObjectInputStream in = new ObjectInputStream(currentServer.getInputStream());
 
 				outputStreams.add(out);
 				inputStreams.add(in);
 				filesPerServer.put(serverAlias, new ArrayList<String>());
-				
+
 				// send files request
 				EncryptedPacket ep = encryptPacket(serverAlias, "", PacketType.AVAILABLE_FILES);
 				if (ep == null) {
@@ -625,7 +663,7 @@ public class Peer {
 
 		HashMap<String, HashMap<Integer, byte[]>> filesShares = new HashMap<String, HashMap<Integer, byte[]>>();
 
-		//iterate through all servers
+		// iterate through all servers
 		for (int i = 0; i < servers.length; i++) {
 			if (servers[i] == null) {
 				outputStreams.add(null);
@@ -639,17 +677,17 @@ public class Peer {
 
 			List<String> filenames = filesPerServer.get(serverAlias);
 
-			//iterate through all files available in the server			
+			// iterate through all files available in the server
 			for (String filename : filenames) {
 				String encShare = retrieveShare(serverAlias, filename, out, in);
 
 				if (encShare == null) {
 					continue;
 				}
-				
+
 				System.out.println("New share retrieved");
-				
-				//get each share
+
+				// get each share
 				byte[] shareB64 = Base64.getDecoder().decode(encShare.getBytes());
 
 				if (filesShares.containsKey(filename)) {
@@ -659,27 +697,27 @@ public class Peer {
 						System.out.println("Error");
 						System.exit(-1);
 					}
-					
-					shares.put(i+1, shareB64);
-				}else {
+
+					shares.put(i + 1, shareB64);
+				} else {
 					HashMap<Integer, byte[]> shares = new HashMap<Integer, byte[]>();
-					shares.put(i+1, shareB64);
+					shares.put(i + 1, shareB64);
 					filesShares.put(filename, shares);
 				}
 			}
 		}
-		
+
 		for (Map.Entry<String, HashMap<Integer, byte[]>> entry : filesShares.entrySet()) {
 			String filename = entry.getKey();
 			HashMap<Integer, byte[]> shares = entry.getValue();
 			File rebuiltFile = null;
 			System.out.println("Trying to rebuil " + filename);
-			if(couldRebuildFile(filename, shares, rebuiltFile))
+			if (couldRebuildFile(filename, shares, rebuiltFile))
 				System.out.println("File rebuilt with success");
 			else
 				System.out.println("Could not rebuild file");
 		}
-		
+
 		System.out.flush();
 	}
 
@@ -748,72 +786,275 @@ public class Peer {
 		System.out.println("------------------------------------");
 	}
 
-	public void searchInConversations(String keywords) {
+	private void retrieveMasterKey() throws UnrecoverableKeyException, KeyStoreException, NoSuchAlgorithmException,
+			CertificateException, IOException {
+		masterKey = (SecretKey) keyStore.getKey("masterKey", password.toCharArray());
+		if (masterKey == null) {
+			System.out.println("Key does not exist. Creating new master key...");
+			KeyGenerator keyGen = KeyGenerator.getInstance("AES");
+			keyGen.init(256);
+			masterKey = keyGen.generateKey();
 
-		SSLSocket[] servers = connectToBackupServer();
+			// save key to keystore
+			System.out.println("Saving master key...");
+			KeyStore.SecretKeyEntry keyEntry = new KeyStore.SecretKeyEntry(masterKey);
+			KeyStore.ProtectionParameter protectionParam = new KeyStore.PasswordProtection(password.toCharArray());
+			keyStore.setEntry("masterKey", keyEntry, protectionParam);
 
-		System.out.println(backupServersDown(servers));
-		if (backupServersDown(servers)) {
-			System.out.println("Searching locally");
-			searchLocal(keywords);
-		} else {
-
-			// hash keyword
-			String hash = createLabel(keywords);
-
-			if (hash == null) {
-				return;
-			}
-
-			// we assume that the first available server has an up to date table
-			// send to server
-			int i = 0;
-			SSLSocket currentServer = null;
-			for (; i < servers.length; i++) { // this is so scuffed
-				currentServer = servers[i];
-				if (currentServer != null) {
-					break;
-				}
-			}
-
-			if (currentServer == null) { // if we're in the remote search part of the function this shouldnt happen but
-											// just in case
-				System.err.println("Error with connecting to server");
-				return;
-			}
-
-			String serverAlias = serverAliases.get(i);
-			try {
-				ObjectOutputStream out = new ObjectOutputStream(currentServer.getOutputStream());
-				ObjectInputStream in = new ObjectInputStream(currentServer.getInputStream());
-
-				EncryptedPacket labelPacket = encryptPacket(serverAlias, hash, PacketType.SEARCH);
-				out.writeObject(labelPacket);
-
-				// receive reply
-				EncryptedPacket encResponse = (EncryptedPacket) in.readObject();
-
-				if (encResponse.getEncryptedData() == null || encResponse.getEncryptedAESKey() == null
-						|| encResponse.getIv() == null) {
-					System.err.println("Something went wrong. Try again.");
-					return;
-				}
-
-				Packet response = tryReadMessage(encResponse);
-
-				if (response == null) {
-					System.err.println("Something went wrong. Try again.");
-					return;
-				}
-
-				System.out.println(response.get_data()); // made it so the server sends it in an orderly fashion
-
-			} catch (IOException e) {
-				System.err.println("Error with streams");
-			} catch (ClassNotFoundException e) {
-				System.err.println("Error with classes. Class not found.");
+			try (FileOutputStream fos = new FileOutputStream("keystore/" + name + "-keystore.jceks")) {
+				keyStore.store(fos, password.toCharArray()); // Save the keystore
 			}
 		}
+	}
+
+	private void saveSEParams(byte[] sk, byte[] iv) {
+		try {
+			Cipher cipher = Cipher.getInstance("AES");
+			cipher.init(Cipher.ENCRYPT_MODE, masterKey);
+
+			// Encrypt sk and iv
+			byte[] encryptedSk = cipher.doFinal(sk);
+			byte[] encryptedIv = cipher.doFinal(iv);
+
+			// Combine encrypted sk and iv (you can separate them in the file if needed)
+			byte[] encryptedData = new byte[encryptedSk.length + encryptedIv.length];
+			System.arraycopy(encryptedSk, 0, encryptedData, 0, encryptedSk.length);
+			System.arraycopy(encryptedIv, 0, encryptedData, encryptedSk.length, encryptedIv.length);
+
+			// Convert encrypted data to base64
+			String base64Encoded = Base64.getEncoder().encodeToString(encryptedData);
+
+			// Save the base64 encoded data to a file
+			try (FileOutputStream fileOutputStream = new FileOutputStream("se-params.dat")) {
+				fileOutputStream.write(base64Encoded.getBytes());
+				System.out.println("se-params.dat file has been saved with encrypted parameters.");
+			}
+
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	private void loadSEParams(byte[] sk, byte[] iv) {
+		try {
+			// Read the base64 encoded data from the file
+			FileInputStream fileInputStream = new FileInputStream("se-params.dat");
+			byte[] fileData = new byte[fileInputStream.available()];
+			fileInputStream.read(fileData);
+			fileInputStream.close();
+
+			// Decode the base64 data
+			byte[] decodedData = Base64.getDecoder().decode(fileData);
+
+			// Calculate the lengths dynamically
+			int skLength = decodedData.length / 2; // Assuming sk and iv are equal lengths, or adjust if not
+			int ivLength = decodedData.length - skLength;
+
+			byte[] encryptedSk = new byte[skLength];
+			byte[] encryptedIv = new byte[ivLength];
+			System.arraycopy(decodedData, 0, encryptedSk, 0, skLength);
+			System.arraycopy(decodedData, skLength, encryptedIv, 0, ivLength);
+
+			Cipher cipher = Cipher.getInstance("AES");
+
+			cipher.init(Cipher.DECRYPT_MODE, masterKey);
+
+			// Decrypt the sk and iv
+			sk = cipher.doFinal(encryptedSk);
+			iv = cipher.doFinal(encryptedIv);
+
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	public void searchInConversations(String keyword) throws NoSuchAlgorithmException, NoSuchPaddingException,
+			InvalidKeyException, InvalidAlgorithmParameterException, IllegalBlockSizeException, BadPaddingException {
+		SSLSocket[] servers = connectToBackupServer();
+
+		if (backupServersDown(servers)) {
+			System.out.println("Searching locally");
+			searchLocal(keyword);
+		} else {
+			initSKIV();
+
+			// Generate k1 and k2 from keyword
+		    hmac.init(sk);
+		    SecretKeySpec k1 = new SecretKeySpec(hmac.doFinal((keyword + "1").getBytes()), HMAC_ALG);
+			SecretKeySpec k2 = new SecretKeySpec(hmac.doFinal((keyword + "2").getBytes()), 0, 16, CIPHER_ALG);
+
+		    String b64K1 = Base64.getEncoder().encodeToString(k1.getEncoded());
+		    // Query the server with k1
+//		    List<byte[]> encryptedResults = server.search(k1.getEncoded());
+
+		    String searchResult = searchTermToServers(b64K1);
+		    if(searchResult == null) {
+		    	System.out.println("No search result found");
+		    	return;
+		    }
+		    String[] b64Results = searchResult.split("@");
+		    List<byte[]> encryptedResults = new ArrayList<byte[]>();
+		    for (String string : b64Results) {
+				encryptedResults.add(Base64.getDecoder().decode(string));
+			}
+		    
+		    // Decrypt the results using k2
+		    List<String> results = new LinkedList<>();
+		    aes.init(Cipher.DECRYPT_MODE, k2, iv);
+		    for (byte[] encryptedDocName : encryptedResults) {
+		        byte[] docNameBytes = aes.doFinal(encryptedDocName);
+		        results.add(new String(docNameBytes)); // Convert decrypted bytes back into a string
+		    }
+		    System.out.println("Results=" + results.toString());
+		}
+	}
+
+	private void initSKIV() {
+		if (sk == null || iv == null) {
+			try {
+				retrieveMasterKey();
+			} catch (UnrecoverableKeyException | KeyStoreException | NoSuchAlgorithmException | CertificateException
+					| IOException e) {
+				System.out.println("Error while trying to retrieve master key");
+				return;
+			}
+
+			byte[] sk_bytes = new byte[20];
+			byte[] iv_bytes = new byte[16];
+			File paramFile = new File("se-params.dat");
+
+			if (paramFile.exists()) {
+				// read and decode params
+				loadSEParams(sk_bytes, iv_bytes);
+			} else {
+				// create and save params
+				SecureRandom rnd = new SecureRandom();
+				rnd.nextBytes(sk_bytes);
+				rnd.nextBytes(iv_bytes);
+
+				saveSEParams(sk_bytes, iv_bytes);
+			}
+
+			sk = new SecretKeySpec(sk_bytes, HMAC_ALG);
+			iv = new IvParameterSpec(iv_bytes); // should change for every entry
+			System.out.println("SKIV initialized");
+		}
+		System.out.println("SKIV already initialized");
+	}
+
+	private void updateSearchTerms(String keyword, String filename)
+			throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException,
+			InvalidAlgorithmParameterException, IllegalBlockSizeException, BadPaddingException {
+
+		initSKIV();
+
+		hmac.init(sk);
+		SecretKeySpec k1 = new SecretKeySpec(hmac.doFinal((keyword + "1").getBytes()), HMAC_ALG);
+		SecretKeySpec k2 = new SecretKeySpec(hmac.doFinal((keyword + "2").getBytes()), 0, 16, CIPHER_ALG);
+
+		int c = counters.getOrDefault(keyword, 0);
+
+		hmac.init(k1);
+		byte[] l = hmac.doFinal(ByteBuffer.allocate(4).putInt(c).array());
+
+		aes.init(Cipher.ENCRYPT_MODE, k2, iv);
+		byte[] d = aes.doFinal(filename.getBytes());
+
+		// Send l and d to the server to update the index
+		String term = Base64.getEncoder().encodeToString(l) + "@" + Base64.getEncoder().encodeToString(d);
+		System.out.println("New Search term entry= " + term);
+		sendTermToServers(term);
+		// Increment counter c and update it in counters
+		counters.put(keyword, ++c);
+	}
+
+	/**
+	 * Sends a new search term to the servers
+	 * 
+	 * @param term the new term
+	 * @return the search result null otherwise
+	 */
+	private String searchTermToServers(String term) {
+		SSLSocket[] servers = connectToBackupServer();
+
+		if (backupServersDown(servers)) {
+			return null;
+		}
+
+		for (int i = 0; i < servers.length; i++) {
+
+			if (servers[i] == null) {
+				continue;
+			}
+			try {
+				ObjectOutputStream out = new ObjectOutputStream(servers[i].getOutputStream());
+				ObjectInputStream in = new ObjectInputStream(servers[i].getInputStream());
+
+				String serverAlias = serverAliases.get(i);
+
+				EncryptedPacket ep = encryptPacket(serverAlias, term, PacketType.SEARCH);
+				out.writeObject(ep);
+
+				EncryptedPacket er = (EncryptedPacket) in.readObject();
+
+				Packet p = tryReadMessage(er);
+
+				if(p == null) {
+					return null;
+				}
+				servers[i].close();
+				
+				return p.get_data();
+			} catch (IOException | ClassNotFoundException e) {
+				e.printStackTrace();
+				return null;
+			}
+		}
+		return null;
+	}
+	
+	/**
+	 * Sends a new search term to the servers
+	 * 
+	 * @param term the new term
+	 * @return 0 if successful, -2 if all servers are down, -1 in case of error
+	 */
+	private int sendTermToServers(String term) {
+		SSLSocket[] servers = connectToBackupServer();
+
+		if (backupServersDown(servers)) {
+			return -2;
+		}
+
+		for (int i = 0; i < servers.length; i++) {
+
+			if (servers[i] == null) {
+				continue;
+			}
+			try {
+				ObjectOutputStream out = new ObjectOutputStream(servers[i].getOutputStream());
+				ObjectInputStream in = new ObjectInputStream(servers[i].getInputStream());
+
+				String serverAlias = serverAliases.get(i);
+
+				EncryptedPacket ep = encryptPacket(serverAlias, term, PacketType.ADD_KEYWORD);
+				out.writeObject(ep);
+
+				EncryptedPacket er = (EncryptedPacket) in.readObject();
+
+				Packet p = tryReadMessage(er);
+				
+				servers[i].close();
+				if (!p.get_packet_type().equals(PacketType.ACK)) {
+					return -1;
+				}
+			} catch (IOException | ClassNotFoundException e) {
+				e.printStackTrace();
+				return -1;
+			}
+		}
+
+		return 0;
 	}
 
 	// this is the type of function that should probably be somewhere else but

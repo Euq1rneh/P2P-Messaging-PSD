@@ -63,7 +63,7 @@ for i in {1..4}; do
   jar cmf "$MANIFEST_FILE" "$PEER_DIR/$CLIENT_JAR_NAME" -C "$BIN_DIR" client -C "$BIN_DIR" common
 
   # Copy corresponding keystores and truststore
-  copy_stores "$PEER_DIR" "fc$i$i$i$i$i-keystore.jceks" "truststore.jceks"
+  #copy_stores "$PEER_DIR" "fc$i$i$i$i$i-keystore.jceks" "truststore.jceks"
 done
 
 # Create a Manifest File for the Server JAR with Class-Path entry

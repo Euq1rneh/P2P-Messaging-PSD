@@ -9,6 +9,7 @@ import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.UnrecoverableKeyException;
+import java.util.HashMap;
 import java.util.Properties;
 import javax.net.ssl.KeyManager;
 import javax.net.ssl.KeyManagerFactory;
@@ -16,6 +17,7 @@ import javax.net.ssl.SSLSocket;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 
+import common.ByteArray;
 import common.Stores;
 import server.crypto.Encryption;
 import server.messages.MessageReader;
@@ -41,6 +43,7 @@ public class Main {
 	private static String username;
 	private static int port;
 	
+	private static HashMap<String, HashMap<ByteArray, ByteArray>> searchMaps = new HashMap<String, HashMap<ByteArray,ByteArray>>();
 	
 	/**
 	 * Reads the INI file that contains the necessary values to start the program
@@ -122,6 +125,16 @@ public class Main {
 
 	}
 	
+	public static HashMap<ByteArray, ByteArray> getSearchMap(String username){
+		HashMap<ByteArray, ByteArray> map = searchMaps.get(username);
+		
+		if(map == null) {
+			map = new HashMap<ByteArray, ByteArray>();
+			searchMaps.put(username, map);
+		}
+		return map;
+	}
+	
 	public static void main(String[] args) {
 
 		//alias, port, keystore, password keystore,trust
@@ -149,15 +162,13 @@ public class Main {
 		ServerFiles.createDirs();
 		Encryption.setConfig(username, password, keyStore, trustStore);
 		
-		ServerMaps serverMaps = new ServerMaps();
-		
 		serverSocket = ConnectionManager.createServerSocket(port, keyStore, keyManagers, trustManagers);
 		System.out.println("Started backup server");
 		while (!serverSocket.isClosed()) {
 			try {
 				SSLSocket clientSocket = (SSLSocket) serverSocket.accept();
 				System.out.println("New client connection");
-				new Thread(new MessageReader(clientSocket, running, serverMaps)).start();
+				new Thread(new MessageReader(clientSocket, running)).start();
 			} catch (SocketException e) {
 				// this exception hopefully will only be thrown when quiting the program
 				// so there is no need to handle the error
