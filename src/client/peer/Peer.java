@@ -1,9 +1,14 @@
 package client.peer;
 
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
-
+import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -24,6 +29,7 @@ import java.security.cert.CertificateException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -33,6 +39,8 @@ import java.util.Scanner;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
+import javax.crypto.CipherInputStream;
+import javax.crypto.CipherOutputStream;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.KeyGenerator;
 import javax.crypto.Mac;
@@ -84,7 +92,8 @@ public class Peer {
 	private ShamirScheme scheme;
 
 	private SecretKey masterKey;
-	private HashMap<String, Integer> counters = new HashMap<String, Integer>(100);
+	private Map<String, Integer> counters = Collections.synchronizedMap(new HashMap<>(100));
+
 	private SecretKeySpec sk;
 	private IvParameterSpec iv;
 	private Mac hmac;
@@ -114,7 +123,104 @@ public class Peer {
 			e.printStackTrace();
 		}
 	}
+	
+	private void initSKIV() {
+		if (sk == null || iv == null) {
+			try {
+				retrieveMasterKey();
+			} catch (UnrecoverableKeyException | KeyStoreException | NoSuchAlgorithmException | CertificateException
+					| IOException e) {
+				System.out.println("Error while trying to retrieve master key");
+				return;
+			}
 
+			byte[] sk_bytes = new byte[20];
+			byte[] iv_bytes = new byte[16];
+			File paramFile = new File("se-params.dat");
+
+			if (paramFile.exists()) {
+				// read and decode params
+				loadSEParams();
+				System.out.println("SKIV loaded");
+			} else {
+				// create and save params
+				SecureRandom rnd = new SecureRandom();
+				rnd.nextBytes(sk_bytes);
+				rnd.nextBytes(iv_bytes);
+
+				saveSEParams(sk_bytes, iv_bytes);
+				System.out.println("New SKIV");
+				sk = new SecretKeySpec(sk_bytes, HMAC_ALG);
+				iv = new IvParameterSpec(iv_bytes); // should change for every entry
+			}
+			
+			System.out.println("Loaded SK: " + Base64.getEncoder().encodeToString(sk.getEncoded()));
+			return;
+		}
+		System.out.println("SKIV already loaded");
+	}
+	
+    public void saveCounters() throws Exception {
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter("se-counters.dat"))) {
+            // Generate a new IV for this session
+            byte[] ivBytes = new byte[16];
+            new java.security.SecureRandom().nextBytes(ivBytes);
+            IvParameterSpec iv = new IvParameterSpec(ivBytes);
+
+            // Write the IV as Base64 in the first line
+            String ivBase64 = Base64.getEncoder().encodeToString(ivBytes);
+            writer.write(ivBase64);
+            writer.newLine();
+
+            // Initialize the cipher for encryption
+            Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+            cipher.init(Cipher.ENCRYPT_MODE, masterKey, iv);
+
+            for (Map.Entry<String, Integer> entry : counters.entrySet()) {
+                // Serialize the key-value pair as "key=value"
+                String plainText = entry.getKey() + "=" + entry.getValue();
+
+                // Encrypt the data
+                byte[] encryptedData = cipher.doFinal(plainText.getBytes());
+
+                // Encode to Base64
+                String base64Encoded = Base64.getEncoder().encodeToString(encryptedData);
+                writer.write(base64Encoded);
+                writer.newLine();
+            }
+        }
+    }
+
+    
+    public void loadCounters() throws Exception {
+        counters.clear();
+        try (BufferedReader reader = new BufferedReader(new FileReader("se-counters.dat"))) {
+            // Read the IV from the first line
+            String ivBase64 = reader.readLine();
+            byte[] ivBytes = Base64.getDecoder().decode(ivBase64);
+            IvParameterSpec iv = new IvParameterSpec(ivBytes);
+
+            // Initialize the cipher for decryption
+            Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+            cipher.init(Cipher.DECRYPT_MODE, masterKey, iv);
+
+            String line;
+            while ((line = reader.readLine()) != null) {
+                // Decode Base64
+                byte[] encryptedData = Base64.getDecoder().decode(line);
+
+                // Decrypt the data
+                String decryptedText = new String(cipher.doFinal(encryptedData));
+
+                // Parse the key-value pair
+                String[] parts = decryptedText.split("=", 2);
+                if (parts.length == 2) {
+                    counters.put(parts[0], Integer.parseInt(parts[1]));
+                }
+            }
+        }
+    }
+	
 	/**
 	 * Connect to another peer using their Ip and port
 	 * 
@@ -261,15 +367,6 @@ public class Peer {
 			System.out.println("Could not cast to EncryptedPacket. Class not found");
 			return false;
 		}
-	}
-
-	private String processMSGIntoLabels(String msg) {
-		String[] words = msg.split(" ");
-		StringBuilder sb = new StringBuilder();
-		for (int i = 0; i < words.length; i++) {
-			sb.append(createLabel(words[i]));
-		}
-		return sb.toString();
 	}
 
 	/**
@@ -835,7 +932,7 @@ public class Peer {
 		}
 	}
 
-	private void loadSEParams(byte[] sk, byte[] iv) {
+	private void loadSEParams() {
 		try {
 			// Read the base64 encoded data from the file
 			FileInputStream fileInputStream = new FileInputStream("se-params.dat");
@@ -860,9 +957,12 @@ public class Peer {
 			cipher.init(Cipher.DECRYPT_MODE, masterKey);
 
 			// Decrypt the sk and iv
-			sk = cipher.doFinal(encryptedSk);
-			iv = cipher.doFinal(encryptedIv);
+			byte[] sk_bytes = cipher.doFinal(encryptedSk);
+			byte[] iv_bytes = cipher.doFinal(encryptedIv);
 
+			sk = new SecretKeySpec(sk_bytes, HMAC_ALG);
+			iv = new IvParameterSpec(iv_bytes); // should change for every entry
+			
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -876,16 +976,12 @@ public class Peer {
 			System.out.println("Searching locally");
 			searchLocal(keyword);
 		} else {
-			initSKIV();
-
 			// Generate k1 and k2 from keyword
 		    hmac.init(sk);
 		    SecretKeySpec k1 = new SecretKeySpec(hmac.doFinal((keyword + "1").getBytes()), HMAC_ALG);
 			SecretKeySpec k2 = new SecretKeySpec(hmac.doFinal((keyword + "2").getBytes()), 0, 16, CIPHER_ALG);
 
 		    String b64K1 = Base64.getEncoder().encodeToString(k1.getEncoded());
-		    // Query the server with k1
-//		    List<byte[]> encryptedResults = server.search(k1.getEncoded());
 
 		    String searchResult = searchTermToServers(b64K1);
 		    if(searchResult == null) {
@@ -909,44 +1005,9 @@ public class Peer {
 		}
 	}
 
-	private void initSKIV() {
-		if (sk == null || iv == null) {
-			try {
-				retrieveMasterKey();
-			} catch (UnrecoverableKeyException | KeyStoreException | NoSuchAlgorithmException | CertificateException
-					| IOException e) {
-				System.out.println("Error while trying to retrieve master key");
-				return;
-			}
-
-			byte[] sk_bytes = new byte[20];
-			byte[] iv_bytes = new byte[16];
-			File paramFile = new File("se-params.dat");
-
-			if (paramFile.exists()) {
-				// read and decode params
-				loadSEParams(sk_bytes, iv_bytes);
-			} else {
-				// create and save params
-				SecureRandom rnd = new SecureRandom();
-				rnd.nextBytes(sk_bytes);
-				rnd.nextBytes(iv_bytes);
-
-				saveSEParams(sk_bytes, iv_bytes);
-			}
-
-			sk = new SecretKeySpec(sk_bytes, HMAC_ALG);
-			iv = new IvParameterSpec(iv_bytes); // should change for every entry
-			System.out.println("SKIV initialized");
-		}
-		System.out.println("SKIV already initialized");
-	}
-
 	private void updateSearchTerms(String keyword, String filename)
 			throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException,
 			InvalidAlgorithmParameterException, IllegalBlockSizeException, BadPaddingException {
-
-		initSKIV();
 
 		hmac.init(sk);
 		SecretKeySpec k1 = new SecretKeySpec(hmac.doFinal((keyword + "1").getBytes()), HMAC_ALG);
@@ -966,6 +1027,14 @@ public class Peer {
 		sendTermToServers(term);
 		// Increment counter c and update it in counters
 		counters.put(keyword, ++c);
+		
+		System.out.println("COUNTERS=" + counters.toString());
+		
+		try {
+			saveCounters();
+		} catch (Exception e) {
+			System.out.println("Error saving counters");
+		}
 	}
 
 	/**
@@ -1057,20 +1126,6 @@ public class Peer {
 		return 0;
 	}
 
-	// this is the type of function that should probably be somewhere else but
-	// i currently just want to write something that works
-	// also im unsure as to whether we can hash keywords instead of encrypting them
-	private String createLabel(String keywords) {
-		byte[] hash = null;
-		try {
-			MessageDigest digest = MessageDigest.getInstance("SHA-256");
-			hash = digest.digest(keywords.getBytes("UTF-8"));
-		} catch (Exception e) {
-			System.err.println("Error during label creation. Please try again.");
-		}
-		return Base64.getEncoder().encodeToString(hash);
-	}
-
 	private boolean backupServersDown(SSLSocket[] backups) {
 		return backups == null || Arrays.stream(backups).allMatch(e -> e == null); // might be unnecessary considering
 																					// it's 1 line
@@ -1146,6 +1201,13 @@ public class Peer {
 	public void start(boolean running, KeyStore keyStore, String password) {
 
 		MessageLogger.buildConversationDir();
+		initSKIV();
+		try {
+			loadCounters();
+//			System.out.println("COUNTERS="+ counters.toString());
+		} catch (Exception e) {
+			System.out.println("Error loading SE counters");
+		}
 		// peer_in = ConnectionManager.peer_server(in_port);
 		peer_in = ConnectionManager.createServerSocket(in_port, keyStore, keyManagers, trustManagers);
 

@@ -70,6 +70,4 @@ public class ServerMaps {
 	                           Base64.getEncoder().encodeToString(entry.getValue().getArr()));
 	    }
 	}
-
-
 }

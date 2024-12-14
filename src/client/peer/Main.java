@@ -277,7 +277,7 @@ public class Main {
 
 		password = "";
 
-		clearTerminal();
+//		clearTerminal();
 		while (running) {
 			peer.list_conversations();
 
@@ -307,7 +307,7 @@ public class Main {
 				}
 				String alias = command_args[3];
 
-				clearTerminal();
+//				clearTerminal();
 
 				peer.connect(address, port);
 				peer.try_send_message(sc, alias);
@@ -320,7 +320,7 @@ public class Main {
 				
 				int conversation_id = Integer.parseInt(command_args[1]);
 
-				clearTerminal();
+//				clearTerminal();
 				peer.open_conversation(conversation_id);
 				// need to find a way to get the ip and port of a conversation with another peer
 				// MY IDEA: write the ip and port in the begining of the file since they'll most
@@ -342,7 +342,7 @@ public class Main {
 			
 			} else if (command.equals("")) {
 				// functions as an update to the terminal
-				clearTerminal();
+//				clearTerminal();
 			}
 		}
 	}

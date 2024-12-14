@@ -1,7 +1,10 @@
 package server.server;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.SocketException;
@@ -9,7 +12,9 @@ import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.UnrecoverableKeyException;
+import java.util.Base64;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.Properties;
 import javax.net.ssl.KeyManager;
 import javax.net.ssl.KeyManagerFactory;
@@ -30,9 +35,9 @@ public class Main {
 	private volatile static boolean running = true;
 	private static KeyStore keyStore;
 	private static KeyStore trustStore;
-	
+
 	private static ServerSocket serverSocket;
-	
+
 	private static KeyManager[] keyManagers;
 	private static TrustManager[] trustManagers;
 	private static boolean hasINIFile;
@@ -42,9 +47,9 @@ public class Main {
 	private static String truststorePassword;
 	private static String username;
 	private static int port;
-	
-	private static HashMap<String, HashMap<ByteArray, ByteArray>> searchMaps = new HashMap<String, HashMap<ByteArray,ByteArray>>();
-	
+
+	private static HashMap<String, HashMap<ByteArray, ByteArray>> searchMaps = new HashMap<String, HashMap<ByteArray, ByteArray>>();
+
 	/**
 	 * Reads the INI file that contains the necessary values to start the program
 	 * automatically
@@ -103,7 +108,7 @@ public class Main {
 			return false;
 		}
 	}
-	
+
 	public static void createTrustManager(String kpassword, KeyStore keystore, KeyStore truststore) {
 		KeyManagerFactory keyManager;
 		try {
@@ -124,45 +129,54 @@ public class Main {
 		}
 
 	}
-	
-	public static HashMap<ByteArray, ByteArray> getSearchMap(String username){
+
+	public static HashMap<ByteArray, ByteArray> getSearchMap(String username) {
 		HashMap<ByteArray, ByteArray> map = searchMaps.get(username);
-		
-		if(map == null) {
+
+		if (map == null) {
 			map = new HashMap<ByteArray, ByteArray>();
 			searchMaps.put(username, map);
 		}
 		return map;
 	}
-	
+
 	public static void main(String[] args) {
 
-		//alias, port, keystore, password keystore,trust
-		if(args.length != 5) {
+		// alias, port, keystore, password keystore,trust
+		if (args.length != 5) {
 			readConfigFromINI();
-			if(!hasINIFile) {
+			if (!hasINIFile) {
 				System.out.println("> Missing arguments");
 				System.out.println(" <alias> <port> <keystore-path> <keystore-password> <truststore-path>");
-				return;	
+				return;
 			}
-		}else {
+		} else {
 			username = args[0];
 			String portStr = args[1];
 			keystorePath = args[2];
 			password = args[3];
 			truststorePath = args[4];
-			
+
 			port = Integer.parseInt(portStr);
 		}
-		
+
 		keyStore = Stores.tryLoadKeystore(keystorePath, password);
 		trustStore = Stores.tryLoadTrustStore(truststorePath, "");
 		createTrustManager(password, keyStore, trustStore);
-		
+
 		ServerFiles.createDirs();
-		Encryption.setConfig(username, password, keyStore, trustStore);
+		searchMaps = ServerFiles.readFilesAndRecreateMaps();
 		
+		Encryption.setConfig(username, password, keyStore, trustStore);
+
 		serverSocket = ConnectionManager.createServerSocket(port, keyStore, keyManagers, trustManagers);
+
+		Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+			System.out.println("Shutdown hook triggered. Converting search maps to file...");
+			ServerFiles.convertSearchMapsToFile(searchMaps);
+		}));
+		
+		
 		System.out.println("Started backup server");
 		while (!serverSocket.isClosed()) {
 			try {
