@@ -62,6 +62,10 @@ import common.EncryptedPacket;
 import common.Packet;
 import common.PacketType;
 
+/**
+ * The Peer class represents a network peer capable of establishing connections, exchanging messages, and
+ * performing cryptographic operations to ensure secure communication and storage.
+ */
 public class Peer {
 
 	private static final int SHARE_THRESHOLD = 2; // ALLOWS FOR AT LEAST ONE TO FAIL (SERVER)
@@ -99,6 +103,15 @@ public class Peer {
 	private Mac hmac;
 	private Cipher aes;
 
+	/**
+     * Constructs a Peer instance with the specified parameters.
+     *
+     * @param name       the name of the peer
+     * @param in_port    the port to listen on for incoming connections
+     * @param keyStore   the KeyStore instance for storing cryptographic keys
+     * @param trustStore the TrustStore instance for validating connections
+     * @param password   the password for accessing the key stores
+     */
 	public Peer(String name, int in_port, KeyStore keyStore, KeyStore trustStore, String password) {
 		this.name = name;
 		this.in_port = in_port;
@@ -124,6 +137,9 @@ public class Peer {
 		}
 	}
 	
+	/**
+     * Initializes the secret key and initialization vector (IV) used for SE
+     */
 	private void initSKIV() {
 		if (sk == null || iv == null) {
 			try {
@@ -160,6 +176,11 @@ public class Peer {
 		System.out.println("SKIV already loaded");
 	}
 	
+	/**
+     * Saves the current state of counters to a file with encryption.
+     *
+     * @throws Exception if an error occurs during file writing or encryption
+     */
     public void saveCounters() throws Exception {
         try (BufferedWriter writer = new BufferedWriter(new FileWriter("se-counters.dat"))) {
             // Generate a new IV for this session
@@ -190,8 +211,12 @@ public class Peer {
             }
         }
     }
-
     
+    /**
+     * Loads the state of counters from a file and decodes the contents.
+     *
+     * @throws Exception if an error occurs during file reading or decoding
+     */
     public void loadCounters() throws Exception {
         counters.clear();
         try (BufferedReader reader = new BufferedReader(new FileReader("se-counters.dat"))) {
@@ -221,12 +246,13 @@ public class Peer {
         }
     }
 	
-	/**
-	 * Connect to another peer using their Ip and port
-	 * 
-	 * @param address the ip address of the peer
-	 * @param port    the port of the peer
-	 */
+    /**
+     * Connects to another peer using the specified IP address and port.
+     *
+     * @param address the IP address of the peer
+     * @param port    the port of the peer
+     * @return 0 if the connection is successful, -1 otherwise
+     */
 	public int connect(String address, int port) {
 //    	peer_out = ConnectionManager.try_connect_to_peer(address, port);
 
@@ -279,15 +305,15 @@ public class Peer {
 		return scheme.split(secret.getBytes());
 	}
 
-	/**
-	 * Tries to retrieve a file from the backup servers
-	 * 
-	 * @param serverAlias  the server alias for key retrieval
-	 * @param filename     the name of the file to retrieve
-	 * @param outputStream the output stream of the socket connection to the server
-	 * @param inputStream  the input stream of the socket connection to the server
-	 * @return the file contents if it found the file null otherwise
-	 */
+	 /**
+     * Attempts to retrieve a file share from a backup server.
+     *
+     * @param serverAlias  the server alias for key retrieval
+     * @param filename     the name of the file to retrieve
+     * @param outputStream the output stream of the socket connection to the server
+     * @param inputStream  the input stream of the socket connection to the server
+     * @return the file contents if found, null otherwise
+     */
 	private String retrieveShare(String serverAlias, String filename, ObjectOutputStream outputStream,
 			ObjectInputStream inputStream) {
 		Packet p = new Packet(name, filename, PacketType.RET_FILE);
@@ -571,6 +597,14 @@ public class Peer {
 		}
 	}
 
+	/**
+     * Encrypts a packet with the specified alias, message, and packet type.
+     *
+     * @param alias the alias of the recipient
+     * @param msg   the message to encrypt
+     * @param type  the type of the packet
+     * @return the encrypted packet
+     */
 	public EncryptedPacket encryptPacket(String alias, String msg, PacketType type) {
 		System.out.println("Encrypting packet for " + alias);
 		try {
@@ -591,6 +625,13 @@ public class Peer {
 		}
 	}
 
+	/**
+     * Encrypts a packet with the specified alias and packet data.
+     *
+     * @param alias  the alias of the recipient
+     * @param packet the packet to encrypt
+     * @return the encrypted packet
+     */
 	public EncryptedPacket encryptPacket(String alias, Packet packet) {
 
 		try {
@@ -619,14 +660,13 @@ public class Peer {
 	}
 
 	/**
-	 * Sends the specified message to the specified peer (address + port)
-	 * 
-	 * @param msg          the message to send
-	 * @param peer_address the ip address of the peer that should receive the
-	 *                     message
-	 * @param peer_port    the port of the peer that should receive the message
-	 * @return 0 if there was no error -1 otherwise
-	 */
+     * Sends a message to the specified peer.
+     *
+     * @param encPacket the encrypted packet to send
+     * @param in        the input stream to the peer
+     * @param out       the output stream to the peer
+     * @return an acknowledgment packet if successful, null otherwise
+     */
 	private Packet send_message(EncryptedPacket encPacket, ObjectInputStream in, ObjectOutputStream out) {
 		if (encPacket == null) {
 			System.out.println("No message was provided");
@@ -649,10 +689,11 @@ public class Peer {
 	}
 
 	/**
-	 * Tries to read an encrypted message from a peer
-	 * 
-	 * @param message the encrypted message
-	 */
+     * Attempts to read an encrypted message from a peer.
+     *
+     * @param message the encrypted message
+     * @return the decoded packet
+     */
 	public Packet tryReadMessage(EncryptedPacket message) {
 
 		try {
@@ -1195,9 +1236,12 @@ public class Peer {
 	}
 
 	/**
-	 * Starts the peer by opening a socket that is responsible for accepting
-	 * connections and reading the incoming messages
-	 */
+     * Starts the peer, initializing necessary components and accepting connections.
+     *
+     * @param running   a flag indicating whether the peer should continue running
+     * @param keyStore  the KeyStore for cryptographic operations
+     * @param password  the password for the KeyStore
+     */
 	public void start(boolean running, KeyStore keyStore, String password) {
 
 		MessageLogger.buildConversationDir();
