@@ -1016,7 +1016,18 @@ public class Peer {
 
 		    String b64K1 = Base64.getEncoder().encodeToString(k1.getEncoded());
 
-		    String searchResult = searchTermToServers(b64K1);
+		    String searchResult = searchTermToServers(servers, b64K1);
+		    //close connections to server
+		    for (int i = 0; i < servers.length; i++) {
+				try {
+					if (servers[i] != null) {
+						servers[i].close();
+					}
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			}
+		    
 		    if(searchResult == null) {
 		    	System.out.println("No search result found");
 		    	return;
@@ -1079,8 +1090,7 @@ public class Peer {
 	 * @param term the new term
 	 * @return the search result null otherwise
 	 */
-	private String searchTermToServers(String term) {
-		SSLSocket[] servers = connectToBackupServer();
+	private String searchTermToServers(SSLSocket[]servers, String term) {
 
 		if (backupServersDown(servers)) {
 			return null;
@@ -1107,7 +1117,6 @@ public class Peer {
 				if(p == null) {
 					return null;
 				}
-				servers[i].close();
 				
 				return p.get_data();
 			} catch (IOException | ClassNotFoundException e) {
