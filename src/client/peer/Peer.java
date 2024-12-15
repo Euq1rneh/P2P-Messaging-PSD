@@ -33,6 +33,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
+import java.util.Set;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
@@ -1041,7 +1042,7 @@ public class Peer {
 			}
 		    
 		    // Decrypt the results using k2
-		    List<String> results = new LinkedList<>();
+		    Set<String> results = new HashSet<String>();
 		    aes.init(Cipher.DECRYPT_MODE, k2, iv);
 		    for (byte[] encryptedDocName : encryptedResults) {
 		        byte[] docNameBytes = aes.doFinal(encryptedDocName);
