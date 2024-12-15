@@ -124,7 +124,7 @@ java -jar messaginAppPeer.jar
 ### Available Commands (client only, servers do not respond to any terminal commands)
 - **:t ip port alias** - this command allows a peer to send a message to another. The parameters are the ip and port of the peer and the alias of the peer (alias in the truststore where the certificate of that peer is)  
 **:b** - this command can only be used after the :t command and allows the user to go back to the main menu
-- **:o conversation_id** - opens a conversation with id conversation_id  
+- **:o conversation_id** - opens a conversation with id conversation_id  (the id is the number presented before the name of the conversation)
 - **:s keyword** - searches for a keyword in the conversations files and returns the name of the files that contain that word  
 - **:q** - this command allows a user to quit the app  
 
