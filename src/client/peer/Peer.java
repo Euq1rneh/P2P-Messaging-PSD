@@ -2,8 +2,6 @@ package client.peer;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -19,7 +17,6 @@ import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
-import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
@@ -39,8 +36,6 @@ import java.util.Scanner;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
-import javax.crypto.CipherInputStream;
-import javax.crypto.CipherOutputStream;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.KeyGenerator;
 import javax.crypto.Mac;
@@ -157,7 +152,7 @@ public class Peer {
 			if (paramFile.exists()) {
 				// read and decode params
 				loadSEParams();
-				System.out.println("SKIV loaded");
+//				System.out.println("SKIV loaded");
 			} else {
 				// create and save params
 				SecureRandom rnd = new SecureRandom();
@@ -165,15 +160,15 @@ public class Peer {
 				rnd.nextBytes(iv_bytes);
 
 				saveSEParams(sk_bytes, iv_bytes);
-				System.out.println("New SKIV");
+//				System.out.println("New SKIV");
 				sk = new SecretKeySpec(sk_bytes, HMAC_ALG);
 				iv = new IvParameterSpec(iv_bytes); // should change for every entry
 			}
 			
-			System.out.println("Loaded SK: " + Base64.getEncoder().encodeToString(sk.getEncoded()));
+//			System.out.println("Loaded SK: " + Base64.getEncoder().encodeToString(sk.getEncoded()));
 			return;
 		}
-		System.out.println("SKIV already loaded");
+//		System.out.println("SKIV already loaded");
 	}
 	
 	/**
@@ -265,7 +260,6 @@ public class Peer {
 		}
 
 		try {
-
 			out = new ObjectOutputStream(peer_out.getOutputStream());
 			in = new ObjectInputStream(peer_out.getInputStream());
 		} catch (IOException e) {
@@ -286,8 +280,8 @@ public class Peer {
 					connectionArgs[0], Integer.parseInt(connectionArgs[1]));
 
 			if (servers[i] == null) {
-				System.out.println(
-						"Could not connect to server with address " + connectionArgs[0] + ":" + connectionArgs[1]);
+//				System.out.println(
+//						"Could not connect to server with address " + connectionArgs[0] + ":" + connectionArgs[1]);
 			}
 		}
 
@@ -319,29 +313,29 @@ public class Peer {
 		Packet p = new Packet(name, filename, PacketType.RET_FILE);
 
 		String encData = null;
-		System.out.println("Searching for existing file in server " + serverAlias);
+//		System.out.println("Searching for existing file in server " + serverAlias);
 
 		EncryptedPacket encRequest = encryptPacket(serverAlias, p);
 
 		try {
 
-			System.out.println("Sending share request");
+//			System.out.println("Sending share request");
 			outputStream.writeObject(encRequest);
 
-			System.out.println("Waiting for server response...");
+//			System.out.println("Waiting for server response...");
 			EncryptedPacket encResponse = (EncryptedPacket) inputStream.readObject();
 
 			if (encResponse.getEncryptedData() == null || encResponse.getEncryptedAESKey() == null
 					|| encResponse.getIv() == null) {
 
 				// server could not decode message
-				System.out.println("Server could not decode message from client");
+//				System.out.println("Server could not decode message from client");
 				return null;
 			}
 
 			Packet response = tryReadMessage(encResponse);
 
-			System.out.println("Server response detected. Reading response...");
+//			System.out.println("Server response detected. Reading response...");
 
 			if (response == null) {
 				System.out.println("Error while trying to read response from server");
@@ -421,7 +415,7 @@ public class Peer {
 			}
 
 			try {
-				System.out.println("Updating search with term: " + word);
+//				System.out.println("Updating search with term: " + word);
 				updateSearchTerms(word, filename);
 			} catch (InvalidKeyException | NoSuchAlgorithmException | NoSuchPaddingException
 					| InvalidAlgorithmParameterException | IllegalBlockSizeException | BadPaddingException e) {
@@ -464,13 +458,12 @@ public class Peer {
 			} catch (IOException e) {
 				System.out.println("Error with streams");
 				e.printStackTrace();
-				;
 			}
 		}
 
 		// TODO: maybe keep a local copy of search terms to send to the servers
 		if (downServers > SHARE_THRESHOLD) {
-			System.out.println("Using local backup");
+//			System.out.println("Using local backup");
 			MessageLogger.writeMessageLog(msg, filename);
 			return;
 		}
@@ -480,12 +473,10 @@ public class Peer {
 
 		// doesnt have enough shares
 		if (cannotRebuildFile) {
-			// TODO: check if this if is necessary if not declare the variable on line 318
-			// with value and not null
 			conversationFile = new File("conversations/" + alias + ".conversation");
 		} else {
 			String encData = joinShares(parts);
-			System.out.println("Rebuilt file...");
+//			System.out.println("Rebuilt file...");
 			// decrypt file
 			try {
 				conversationFile = HybridEncryption.decryptFile(alias + ".conversation", encData,
@@ -516,7 +507,7 @@ public class Peer {
 
 		Map<Integer, byte[]> shares = splitSecret(secret);
 
-		System.out.println(joinShares(shares));
+//		System.out.println(joinShares(shares));
 //		System.out.println("Sending file to backup servers...");
 		int successfullBackups = 0;
 		for (int i = 0; i < servers.length; i++) {
@@ -545,7 +536,7 @@ public class Peer {
 				System.out.println("Error closing connection to backup server " + i);
 			}
 		}
-		System.out.println("File backup successful. Servers[" + successfullBackups + "/3]");
+//		System.out.println("File backup successful. Servers[" + successfullBackups + "/3]");
 	}
 
 	public void try_send_message(Scanner sc, String alias) {
@@ -606,7 +597,7 @@ public class Peer {
      * @return the encrypted packet
      */
 	public EncryptedPacket encryptPacket(String alias, String msg, PacketType type) {
-		System.out.println("Encrypting packet for " + alias);
+//		System.out.println("Encrypting packet for " + alias);
 		try {
 			PublicKey pk = trustStore.getCertificate(alias).getPublicKey();
 
@@ -769,7 +760,7 @@ public class Peer {
 				Packet p = tryReadMessage(encResponse);
 
 				if (p == null) {
-					System.out.println("Could not read server response");
+//					System.out.println("Could not read server response");
 					continue;
 				}
 
@@ -777,7 +768,7 @@ public class Peer {
 					continue;// no files available
 				}
 
-				System.out.println("Adding file names");
+//				System.out.println("Adding file names");
 				String[] files = p.get_data().split(" ");
 				List<String> fileList = Arrays.asList(files);
 
@@ -785,7 +776,7 @@ public class Peer {
 				serverAvailableFiles.addAll(fileList);
 				filesInServers.addAll(fileList);
 
-				System.out.println("Current available files: " + filesInServers.toString());
+//				System.out.println("Current available files: " + filesInServers.toString());
 
 			} catch (IOException e) {
 				System.out.println("Error with streams");
@@ -823,7 +814,7 @@ public class Peer {
 					continue;
 				}
 
-				System.out.println("New share retrieved");
+//				System.out.println("New share retrieved");
 
 				// get each share
 				byte[] shareB64 = Base64.getDecoder().decode(encShare.getBytes());
@@ -833,7 +824,7 @@ public class Peer {
 
 					if (shares == null) {
 						System.out.println("Error");
-						System.exit(-1);
+						return;
 					}
 
 					shares.put(i + 1, shareB64);
@@ -849,11 +840,14 @@ public class Peer {
 			String filename = entry.getKey();
 			HashMap<Integer, byte[]> shares = entry.getValue();
 			File rebuiltFile = null;
-			System.out.println("Trying to rebuil " + filename);
-			if (couldRebuildFile(filename, shares, rebuiltFile))
-				System.out.println("File rebuilt with success");
-			else
-				System.out.println("Could not rebuild file");
+//			System.out.println("Trying to rebuild " + filename);
+			if (couldRebuildFile(filename, shares, rebuiltFile)) {
+//				System.out.println("File rebuilt with success");	
+			}
+			else {
+//				System.out.println("Could not rebuild file");				
+			}
+
 		}
 
 		System.out.flush();
@@ -907,8 +901,6 @@ public class Peer {
 	}
 
 	public void list_conversations() {
-		// TODO: change get conversations to retrieve any missing files from the backup
-		// servers
 		conversations = MessageLogger.getLocalConversations();
 		System.out.println("----------- Conversations -----------");
 		if (conversations == null) {
@@ -1014,7 +1006,7 @@ public class Peer {
 		SSLSocket[] servers = connectToBackupServer();
 
 		if (backupServersDown(servers)) {
-			System.out.println("Searching locally");
+			System.out.println("Searching locally...");
 			searchLocal(keyword);
 		} else {
 			// Generate k1 and k2 from keyword
@@ -1042,7 +1034,10 @@ public class Peer {
 		        byte[] docNameBytes = aes.doFinal(encryptedDocName);
 		        results.add(new String(docNameBytes)); // Convert decrypted bytes back into a string
 		    }
-		    System.out.println("Results=" + results.toString());
+		    System.out.println("Search result(s) for " + keyword+" returned the following files:");
+		    for (String string : results) {
+				System.out.println("    - "+string);
+			}
 		}
 	}
 
@@ -1064,12 +1059,12 @@ public class Peer {
 
 		// Send l and d to the server to update the index
 		String term = Base64.getEncoder().encodeToString(l) + "@" + Base64.getEncoder().encodeToString(d);
-		System.out.println("New Search term entry= " + term);
+//		System.out.println("New Search term entry= " + term);
 		sendTermToServers(term);
 		// Increment counter c and update it in counters
 		counters.put(keyword, ++c);
 		
-		System.out.println("COUNTERS=" + counters.toString());
+//		System.out.println("COUNTERS=" + counters.toString());
 		
 		try {
 			saveCounters();

@@ -55,7 +55,7 @@ public class MessageReader implements Runnable {
                 //MessageLogger.write_message_log(msg.get_sender() + ": " + msg.get_data(), msg.get_sender() + ".conversation");
 			}
 		} catch (IOException e) {
-			System.out.println("Peer connection closed");
+//			System.out.println("Peer connection closed");
 		} catch (ClassNotFoundException e) {
 			System.out.println("Error: Packet class not found - " + e.getMessage());
 		}

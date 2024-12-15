@@ -172,7 +172,7 @@ public class HybridEncryption {
 		File returnFile = new File("conversations/" + conversationName);
 
 		try (FileOutputStream fos = new FileOutputStream(returnFile)) {
-			System.out.printf("Writing %s to file", decryptedFileBytes);
+//			System.out.printf("Writing %s to file", decryptedFileBytes);
 			fos.write(decryptedFileBytes);
 		} catch (IOException e) {
 			return null;

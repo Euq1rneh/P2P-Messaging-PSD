@@ -65,7 +65,6 @@ public class ConnectionManager {
 		} catch (IOException e) {
 			return null;
 		}
-		
 	}
 
 	/**
