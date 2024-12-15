@@ -430,6 +430,8 @@ public class Peer {
 
 			if (currentServer == null) {
 				downServers++;
+				outputStreams.add(null);
+				inputStreams.add(null);
 				continue; // server connection was not established (might be down for maintenance)
 			}
 
