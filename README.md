@@ -19,7 +19,7 @@ Base Packages
 - **server**: contains classes for server behaviour enabling message searching and file backup
 
 Important Classes
-- **client.Peer**: contains almost all the important behaviour for the clients
+- **client.peer.Peer**: contains almost all the important behaviour for the clients
 - **server.messages.MessageReader**: contains behaviour for processing client requests
 ---
 
