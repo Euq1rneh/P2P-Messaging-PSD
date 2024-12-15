@@ -1,62 +1,130 @@
-# P2P Messaging App
-Data Privacy and Security Project
-Uses java 21
+# Data Privacy and Security Project
 
-## Commands
-  - **:q** - this command allows a user to quit the app
-  - **:t ip port alias** - this command allows a peer to send a     message to another. The parameters are the ip and port of the peer and the alias of the peer (alias in the truststore where the certificate of that peer is)
-  - **:o conversation_id** - opens a conversation with id conversation_id
-  - **:b** - this command can only be used after the **:t command** and allows the user to go back to the main menu
+## Course: MSI/MEI 24/25
 
-### Available users
-    - fc11111
-        Keystore: fc11111-keystore.jceks
-        Password: fc11111
-        Truststore: truststore.jceks (does not have a password)
-    - fc22222
-        Keystore: fc22222-keystore.jceks
-        Password: fc22222
-        Truststore: truststore.jceks (does not have a password)
-    - fc33333
-        Keystore: fc33333-keystore.jceks
-        Password: fc33333
-        Truststore: truststore.jceks (does not have a password)
-    - fc44444
-        Keystore: fc44444-keystore.jceks
-        Password: fc44444
-        Truststore: truststore.jceks (does not have a password)
+### Project Overview
 
+This project involves implementing a peer to peer messaging system using The project is divided into multiple phases:
 
+- **Phase 1**: Basic implementation of the app with message encryption.
+- **Phase 2**: Enhance security and privacy and choose between some tasks. This project implements the long-term storage and searchable encryption tasks
 
-### Functional Examples
-For user fc11111 (assuming there is at least another user)  
+The schemes chosen were Shamir Secret Sharing and Cash Searchable Encryption
 
-To talk to a peer try the command below:  
+---
 
-    :t 127.0.0.1 22222 fc22222
+### Project Structure
+Base Packages
+- **client**: contains classes for the clients to be able to comunicate securely with the servers and other clients
+- **server**: contains classes for server behaviour enabling message searching and file backup
 
-The following menu would appear
+Important Classes
+- **client.Peer**: contains almost all the important behaviour for the clients
+- **server.messages.MessageReader**: contains behaviour for processing client requests
+---
 
-    ---------- Messaging fc22222 ----------
-    Message > Hello
-    Message > 
+### Files in This Repository
 
-Write any message and send it, this will create a `.conversation` file starting with the name of the other peer. In this case 2 files would be created, one for each peer. For peer fc11111 the file `fc22222.conversation` and for peer fc22222 the file `fc11111.conversation`.
+- **src/**: Source code files for the project.
+- **dist/**: Directory for the compiled executables.
+- **docs/**: Directory containing project-related documentation.
+- **build.sh**: Script to compile all source files into executables (client and servers) also creates the necessary file structure to run the executables.
+- **config.ini**: Configuration file for each client and server. Contains the necessary information to start each executable
+---
 
-To return to the main menu just use the :b command (this will not send a message to the peer)
+### User and Server information
+Available users
+```
+- fc11111
+    Keystore: fc11111-keystore.jceks
+    Password: fc11111
+    Truststore: truststore.jceks (does not have a password)
+- fc22222
+    Keystore: fc22222-keystore.jceks
+    Password: fc22222
+    Truststore: truststore.jceks (does not have a password)
+- fc33333
+    Keystore: fc33333-keystore.jceks
+    Password: fc33333
+    Truststore: truststore.jceks (does not have a password)
+- fc44444
+    Keystore: fc44444-keystore.jceks
+    Password: fc44444
+    Truststore: truststore.jceks (does not have a password)
+```
+Available Server
+```
+- amazonServer
+    Keystore: amazonServer-keystore.jceks
+    Password: amazonServer
+    Truststore: truststore.jceks (does not have a password)
+    Port: 1111 (PORT MUST BE THE SAME)
+- googleServer
+    Keystore: googleServer-keystore.jceks
+    Password: googleServer
+    Truststore: truststore.jceks (does not have a password)
+    Port: 3333 (PORT MUST BE THE SAME)
+- oracleServer
+    Keystore: oracleServer-keystore.jceks
+    Password: oracleServer
+    Truststore: truststore.jceks (does not have a password)
+    Port: 2222 (MUST BE THE SAME)
+```
 
+### Installation and Setup
+Before starting make sure that the keystores and truststores directories have keystores in them or the program will not start
 
-    ---------- Messaging fc22222 ----------
-    Message > Hello
-    Message > :b
+#### 1. Run the build script in the root of the project
+```
+./build.sh
+```
+#### 2. Open as many terminals as there will be clients (max of 4) and at least 2 terminals for the servers (max of 3)
+#### 3. In each terminal cd into one of the directories in the dist directory, the compilation script will have created a folder structure that looks like this
+```
+dist
+  amazonServer
+    keystore
+      amazonServer-keystore.jceks
+    truststore
+      truststore.jceks
+    messagingAppServer.jar
+  fc11111
+    keystore
+    truststore
+    messagingAppPeer.jar
+  fc22222
+    ...
+  fc33333
+    ...
+  fc44444
+    ...
+  googleServer
+    ...
+  oracleServer
+    ...
+```
+#### 3. For each executable create a `config.ini` file like replacing the fields with appropriate values (some of the values are written above)
+```
+keystorePath=keystore/amazonServer-keystore.jceks
+keystorePassword=amazonServer
+truststorePath=truststore/truststore.jceks
+truststorePassword=
+username=amazonServer
+port=1111
+```
+#### 4. Run executable (Servers must be executed first)
+For servers
+```
+java -jar messaginAppServer.jar
+```
+For clients
+```
+java -jar messaginAppPeer.jar
+```
+### Available Commands (client only, servers do not respond to any terminal commands)
+- **:t ip port alias** - this command allows a peer to send a message to another. The parameters are the ip and port of the peer and the alias of the peer (alias in the truststore where the certificate of that peer is)  
+**:b** - this command can only be used after the :t command and allows the user to go back to the main menu
+- **:o conversation_id** - opens a conversation with id conversation_id  (the id is the number presented before the name of the conversation)
+- **:s keyword** - searches for a keyword in the conversations files and returns the name of the files that contain that word  
+- **:q** - this command allows a user to quit the app  
 
-
-To open the conversation you just created use the open command (assuming there is a conversation that can be opened):
-
-    :o 0 (zero is the conversation id shown in the terminal)
-
-The following is an example main menu
-
-    ----------------- Conversations -----------------
-    0. fc22222
-    1. John Smith
