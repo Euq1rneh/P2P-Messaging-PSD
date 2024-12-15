@@ -115,7 +115,7 @@ port=1111
 #### 4. Run executable (Servers must be executed first)
 For servers
 ```
-java -jar messaginAppServer.jar
+java -jar messagingAppServer.jar
 ```
 For clients
 ```
